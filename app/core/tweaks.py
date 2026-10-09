@@ -13,7 +13,7 @@ from dataclasses import dataclass, field
 from typing import Any, Callable
 
 from ..config import TWEAK_BACKUP_FILE, load_json, save_json
-from ..utils import as_list, powershell_json, run_command
+from ..utils import as_list, powershell_json, run_command, run_powershell
 from . import registry, services
 
 RISK_LABELS = {"low": "Низкий", "medium": "Средний", "high": "Высокий"}
@@ -386,6 +386,105 @@ def _power_high_revert() -> tuple[bool, str]:
 def _power_high_applied(_mode_map: dict[str, str]) -> bool:
     current = _active_power_scheme()
     return bool(current) and current.lower() == _HIGH_PERFORMANCE_SCHEME
+
+
+# ---------------------------------------------------------------------------
+# Протоколы: SMBv1, NetBIOS, переходные технологии IPv6
+# ---------------------------------------------------------------------------
+_NETBT_INTERFACES = r"SYSTEM\CurrentControlSet\Services\NetBT\Parameters\Interfaces"
+
+
+def _optional_feature_state(name: str) -> str:
+    try:
+        proc = run_powershell(
+            f"(Get-WindowsOptionalFeature -Online -FeatureName {name}).State", timeout=120
+        )
+    except Exception:  # noqa: BLE001
+        return ""
+    return (proc.stdout or "").strip()
+
+
+def _feature_cmd(feature: str, verb: str, done: str, failed: str) -> tuple[bool, str]:
+    proc = run_powershell(
+        f"{verb}-WindowsOptionalFeature -Online -FeatureName {feature} -NoRestart "
+        "-ErrorAction Stop; 'OK'",
+        timeout=300,
+    )
+    if proc.returncode == 0:
+        return True, done
+    return False, (proc.stderr or proc.stdout or "").strip() or failed
+
+
+def _smb1_apply() -> tuple[bool, str]:
+    return _feature_cmd(
+        "SMB1Protocol", "Disable", "SMBv1 отключён (может потребоваться перезагрузка)", "Не удалось отключить SMBv1"
+    )
+
+
+def _smb1_revert() -> tuple[bool, str]:
+    return _feature_cmd(
+        "SMB1Protocol", "Enable", "SMBv1 включён (может потребоваться перезагрузка)", "Не удалось включить SMBv1"
+    )
+
+
+def _smb1_applied(_mode_map: dict[str, str]) -> bool:
+    return _optional_feature_state("SMB1Protocol") == "Disabled"
+
+
+def _netbios_keys() -> list[str]:
+    return [f"{_NETBT_INTERFACES}\\{guid}" for guid in registry.list_subkeys("HKLM", _NETBT_INTERFACES)]
+
+
+def _netbios_apply() -> tuple[bool, str]:
+    keys = _netbios_keys()
+    if not keys:
+        return False, "Интерфейсы NetBIOS не найдены"
+    for path in keys:
+        registry.write_value("HKLM", path, "NetbiosOptions", "REG_DWORD", 2)
+    return True, f"NetBIOS отключён на интерфейсах: {len(keys)}"
+
+
+def _netbios_revert() -> tuple[bool, str]:
+    for path in _netbios_keys():
+        registry.delete_value("HKLM", path, "NetbiosOptions")
+    return True, "NetBIOS включён"
+
+
+def _netbios_applied(_mode_map: dict[str, str]) -> bool:
+    keys = _netbios_keys()
+    if not keys:
+        return False
+    return all(registry.read_value("HKLM", path, "NetbiosOptions")[0] for path in keys)
+
+
+def _ipv6_transition_apply() -> tuple[bool, str]:
+    commands = [
+        "netsh interface teredo set state disabled",
+        "netsh interface 6to4 set state disabled",
+        "netsh interface isatap set state disabled",
+    ]
+    ok = True
+    for command in commands:
+        code, _output = run_command(command, timeout=30)
+        ok = ok and code == 0
+    if ok:
+        return True, "Переходные технологии IPv6 отключены"
+    return False, "Не удалось применить часть команд"
+
+
+def _ipv6_transition_revert() -> tuple[bool, str]:
+    for command in (
+        "netsh interface teredo set state default",
+        "netsh interface 6to4 set state default",
+        "netsh interface isatap set state default",
+    ):
+        run_command(command, timeout=30)
+    return True, "Переходные технологии IPv6 включены"
+
+
+def _ipv6_transition_applied(_mode_map: dict[str, str]) -> bool:
+    code, output = run_command("netsh interface teredo show state", timeout=30)
+    return code == 0 and "disabled" in output.lower()
 
 
 # ---------------------------------------------------------------------------
@@ -1130,5 +1229,187 @@ def build_tweaks() -> list[Tweak]:
             apply_fn=_power_high_apply,
             revert_fn=_power_high_revert,
             is_applied_fn=_power_high_applied,
+        ),
+        Tweak(
+            key="smb1",
+            name="Отключить SMBv1",
+            description="Убирает устаревший и небезопасный протокол SMB версии 1.",
+            category="Протоколы",
+            risk="medium",
+            requires_admin=True,
+            apply_fn=_smb1_apply,
+            revert_fn=_smb1_revert,
+            is_applied_fn=_smb1_applied,
+        ),
+        Tweak(
+            key="smb_server",
+            name="Отключить сервер SMB (общий доступ)",
+            description="Выключает службу «Сервер» (LanmanServer) — доступ к вашим папкам по сети.",
+            category="Протоколы",
+            risk="medium",
+            requires_admin=True,
+            services=[ServiceChange("LanmanServer", "Disabled")],
+        ),
+        Tweak(
+            key="smb_client",
+            name="Отключить клиент SMB",
+            description="Выключает службу «Рабочая станция» (LanmanWorkstation). Сетевые папки станут недоступны.",
+            category="Протоколы",
+            risk="high",
+            requires_admin=True,
+            services=[ServiceChange("LanmanWorkstation", "Disabled")],
+        ),
+        Tweak(
+            key="netbios_helper",
+            name="Отключить службу NetBIOS (TCP/IP Helper)",
+            description="Выключает lmhosts — устаревшее разрешение имён NetBIOS.",
+            category="Протоколы",
+            risk="low",
+            requires_admin=True,
+            services=[ServiceChange("lmhosts", "Disabled")],
+        ),
+        Tweak(
+            key="netbios_over_tcpip",
+            name="Отключить NetBIOS over TCP/IP",
+            description="Отключает NetBIOS на всех сетевых интерфейсах — меньше сетевого шума и рисков.",
+            category="Протоколы",
+            risk="medium",
+            requires_admin=True,
+            apply_fn=_netbios_apply,
+            revert_fn=_netbios_revert,
+            is_applied_fn=_netbios_applied,
+        ),
+        Tweak(
+            key="ipv6_transition",
+            name="Отключить переходные технологии IPv6",
+            description="Выключает Teredo, 6to4 и ISATAP — не нужны при обычном IPv4/IPv6.",
+            category="Протоколы",
+            risk="low",
+            requires_admin=True,
+            apply_fn=_ipv6_transition_apply,
+            revert_fn=_ipv6_transition_revert,
+            is_applied_fn=_ipv6_transition_applied,
+        ),
+        Tweak(
+            key="print_spooler",
+            name="Отключить диспетчер печати",
+            description="Выключает службу Print Spooler (Spooler). Печать станет недоступна.",
+            category="Службы",
+            risk="medium",
+            requires_admin=True,
+            services=[ServiceChange("Spooler", "Disabled")],
+        ),
+        Tweak(
+            key="remote_desktop",
+            name="Отключить удалённый рабочий стол",
+            description="Выключает TermService — входящие подключения RDP.",
+            category="Службы",
+            risk="medium",
+            requires_admin=True,
+            services=[ServiceChange("TermService", "Disabled")],
+        ),
+        Tweak(
+            key="winrm",
+            name="Отключить WinRM",
+            description="Выключает удалённое управление Windows (Windows Remote Management).",
+            category="Службы",
+            risk="medium",
+            requires_admin=True,
+            services=[ServiceChange("WinRM", "Disabled")],
+        ),
+        Tweak(
+            key="ics",
+            name="Отключить общий доступ к подключению (ICS)",
+            description="Выключает службу SharedAccess — раздачу интернета другим устройствам.",
+            category="Службы",
+            risk="low",
+            requires_admin=True,
+            services=[ServiceChange("SharedAccess", "Disabled")],
+        ),
+        Tweak(
+            key="secondary_logon",
+            name="Отключить вторичный вход",
+            description="Выключает службу seclogon (запуск от другого пользователя).",
+            category="Службы",
+            risk="low",
+            requires_admin=True,
+            services=[ServiceChange("seclogon", "Disabled")],
+        ),
+        Tweak(
+            key="tablet_input",
+            name="Отключить службу планшета и рукописного ввода",
+            description="Выключает TabletInputService — нужно только при сенсорном экране/перьях.",
+            category="Службы",
+            risk="low",
+            requires_admin=True,
+            services=[ServiceChange("TabletInputService", "Disabled")],
+        ),
+        Tweak(
+            key="bluetooth",
+            name="Отключить службы Bluetooth",
+            description="Выключает bthserv — если Bluetooth не используется.",
+            category="Службы",
+            risk="medium",
+            requires_admin=True,
+            services=[ServiceChange("bthserv", "Disabled")],
+        ),
+        Tweak(
+            key="biometric",
+            name="Отключить биометрию (Windows Hello)",
+            description="Выключает WbioSrvc — службу распознавания отпечатков и лица.",
+            category="Службы",
+            risk="medium",
+            requires_admin=True,
+            services=[ServiceChange("WbioSrvc", "Disabled")],
+        ),
+        Tweak(
+            key="alljoyn",
+            name="Отключить AllJoyn Router",
+            description="Выключает AJRouter — маршрутизацию устройств Интернета вещей.",
+            category="Службы",
+            risk="low",
+            requires_admin=True,
+            services=[ServiceChange("AJRouter", "Disabled")],
+        ),
+        Tweak(
+            key="prefetch",
+            name="Отключить Prefetch/SuperFetch (реестр)",
+            description="Убирает предзагрузку приложений на уровне ядра. Полезно на SSD.",
+            category="Производительность",
+            risk="medium",
+            requires_admin=True,
+            writes=[
+                RegWrite(
+                    "HKLM",
+                    r"SYSTEM\CurrentControlSet\Control\Session Manager\Memory Management\PrefetchParameters",
+                    "EnablePrefetcher",
+                    "REG_DWORD",
+                    0,
+                ),
+                RegWrite(
+                    "HKLM",
+                    r"SYSTEM\CurrentControlSet\Control\Session Manager\Memory Management\PrefetchParameters",
+                    "EnableSuperfetch",
+                    "REG_DWORD",
+                    0,
+                ),
+            ],
+        ),
+        Tweak(
+            key="priority_separation",
+            name="Приоритет активных программ",
+            description="Настраивает планировщик на отзывчивость активного приложения.",
+            category="Производительность",
+            risk="medium",
+            requires_admin=True,
+            writes=[
+                RegWrite(
+                    "HKLM",
+                    r"SYSTEM\CurrentControlSet\Control\PriorityControl",
+                    "Win32PrioritySeparation",
+                    "REG_DWORD",
+                    38,
+                ),
+            ],
         ),
     ]
