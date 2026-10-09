@@ -174,6 +174,4 @@ def scrollable(widget: QWidget) -> QScrollArea:
     area.setFrameShape(QFrame.NoFrame)
     area.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
     area.setWidget(widget)
-    area.setStyleSheet("QScrollArea { background: transparent; border: none; }")
-    area.viewport().setAutoFillBackground(False)
     return area

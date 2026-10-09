@@ -83,6 +83,16 @@ _TEMPLATE = """
     QMainWindow, QWidget#Root {{
         background: {BG};
     }}
+    QScrollArea {{
+        background: {BG};
+        border: none;
+    }}
+    QScrollArea > QWidget {{
+        background: {BG};
+    }}
+    QScrollArea > QWidget > QWidget {{
+        background: transparent;
+    }}
     QWidget#Sidebar {{
         background: {BG_ALT};
         border-right: 1px solid {BORDER};
