@@ -1,8 +1,6 @@
 """Стартовая страница: характеристики ПК и загрузка в реальном времени."""
 from __future__ import annotations
 
-import webbrowser
-
 from PySide6.QtCore import QTimer
 from PySide6.QtWidgets import (
     QFrame,
@@ -10,19 +8,12 @@ from PySide6.QtWidgets import (
     QHBoxLayout,
     QLabel,
     QProgressBar,
-    QPushButton,
     QVBoxLayout,
     QWidget,
 )
 
 from ...core.hardware import SystemInfo, collect_system_info, live_stats
-from ...core.sensors import (
-    LHM_DOWNLOAD_URL,
-    SensorReading,
-    collect_temperatures,
-    find_hardware_monitor,
-    launch_hardware_monitor,
-)
+from ...core.sensors import SensorReading, collect_temperatures
 from ...core.workers import Worker, start_worker
 from ...utils import format_bytes, format_mhz
 from .. import theme
@@ -120,15 +111,6 @@ class DashboardPage(QWidget):
         grid.addWidget(self.board_card, 2, 1)
         self.sensors_card = Card("Датчики и температура")
         self.sensors_card.add_row("Статус", "Чтение датчиков…")
-
-        self._lhm_mode = "download"
-        self.lhm_btn = QPushButton("LHM")
-        self.lhm_btn.setToolTip(
-            "LibreHardwareMonitor открывает температуру CPU и обороты вентиляторов через WMI"
-        )
-        self.lhm_btn.clicked.connect(self._on_lhm_clicked)
-        self.sensors_card.add_header_widget(self.lhm_btn)
-
         grid.addWidget(self.sensors_card, 3, 0, 1, 2)
         grid.setColumnStretch(0, 1)
         grid.setColumnStretch(1, 1)
@@ -293,17 +275,10 @@ class DashboardPage(QWidget):
         self._sensors_busy = False
         card = self.sensors_card
         card.clear()
-        lhm_active = any(reading.source == "LHM" for reading in readings)
-        self._update_lhm_button(lhm_active)
-
         if not readings:
-            card.add_row(
-                "Статус",
-                "Датчики не найдены. Запустите LibreHardwareMonitor (кнопка справа).",
-            )
+            card.add_row("Статус", "Датчики не найдены.")
             return
         palette = theme.palette()
-        has_lhm = any(reading.component == "Датчик" for reading in readings)
         for reading in readings:
             text = (
                 f"{reading.value:.0f} RPM"
@@ -317,38 +292,8 @@ class DashboardPage(QWidget):
                     value_label.setStyleSheet(f"color: {palette['DANGER']};")
                 elif reading.value >= 70:
                     value_label.setStyleSheet(f"color: {palette['WARN']};")
-        if not has_lhm:
-            card.add_row(
-                "Совет",
-                "Температура CPU и обороты вентиляторов появятся после запуска "
-                "LibreHardwareMonitor (кнопка справа).",
-            )
-
-    def _update_lhm_button(self, active: bool) -> None:
-        if active:
-            self._lhm_mode = "active"
-            self.lhm_btn.setText("LHM АКТИВЕН")
-            self.lhm_btn.setEnabled(False)
-            return
-        self.lhm_btn.setEnabled(True)
-        if find_hardware_monitor():
-            self._lhm_mode = "launch"
-            self.lhm_btn.setText("ЗАПУСТИТЬ LHM")
-        else:
-            self._lhm_mode = "download"
-            self.lhm_btn.setText("СКАЧАТЬ LHM")
-
-    def _on_lhm_clicked(self) -> None:
-        if self._lhm_mode == "launch":
-            ok, message = launch_hardware_monitor()
-            if not ok:
-                self.sensors_card.clear()
-                self.sensors_card.add_row("LibreHardwareMonitor", message)
-        else:
-            webbrowser.open(LHM_DOWNLOAD_URL)
 
     def _on_sensors_failed(self, message: str) -> None:
         self._sensors_busy = False
-        self._update_lhm_button(False)
         self.sensors_card.clear()
         self.sensors_card.add_row("Статус", f"Не удалось прочитать датчики: {message}")
