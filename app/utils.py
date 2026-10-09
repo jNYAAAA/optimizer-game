@@ -134,3 +134,11 @@ def open_path(path: str | os.PathLike) -> None:
         os.startfile(str(path))  # type: ignore[attr-defined]
     else:  # pragma: no cover - приложение рассчитано на Windows
         subprocess.Popen(["xdg-open", str(path)])
+
+
+def resource_path(relative: str) -> str:
+    """Путь к ресурсу: работает и из исходников, и из собранного PyInstaller .exe."""
+    base = getattr(sys, "_MEIPASS", None)
+    if base is None:
+        base = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    return os.path.join(base, relative)

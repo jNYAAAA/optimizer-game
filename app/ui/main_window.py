@@ -1,8 +1,12 @@
 """Главное окно приложения."""
 from __future__ import annotations
 
+import math
+import os
 import sys
 
+from PySide6.QtCore import QTimer
+from PySide6.QtGui import QIcon
 from PySide6.QtWidgets import (
     QApplication,
     QHBoxLayout,
@@ -24,11 +28,13 @@ from ..config import (
     load_settings,
     save_settings,
 )
+from ..utils import resource_path
 from . import theme
 from .pages.dashboard import DashboardPage
 from .pages.optimize import OptimizePage
 from .pages.settings import SettingsPage
 from .pages.tweaks import TweaksPage
+from .splash import SplashScreen
 from .widgets import ThemeToggleButton
 
 
@@ -126,13 +132,52 @@ class MainWindow(QMainWindow):
         save_settings(settings)
 
 
+def _splash_message(value: float) -> str:
+    if value < 30:
+        return "Инициализация…"
+    if value < 60:
+        return "Чтение настроек…"
+    if value < 90:
+        return "Подготовка интерфейса…"
+    return "Почти готово…"
+
+
 def run() -> int:
     app = QApplication.instance() or QApplication(sys.argv)
     app.setApplicationName(APP_NAME)
     app.setApplicationDisplayName(APP_DISPLAY_NAME)
     app.setStyle("Fusion")
+
+    icon_path = resource_path(os.path.join("assets", "icon.ico"))
+    if os.path.exists(icon_path):
+        app.setWindowIcon(QIcon(icon_path))
+
     theme.set_current(str(load_settings().get("theme", "dark")))
     app.setStyleSheet(theme.styles())
-    window = MainWindow()
-    window.show()
+
+    splash = SplashScreen()
+    splash.show()
+    app.processEvents()
+
+    state = {"value": 0.0, "phase": 0.0}
+    tick = QTimer()
+    tick.setInterval(30)
+
+    def on_tick() -> None:
+        state["value"] = min(state["value"] + 2.4, 100.0)
+        state["phase"] = (state["phase"] + 0.09) % (2 * math.pi)
+        splash.update_progress(state["value"], state["phase"], _splash_message(state["value"]))
+
+    tick.timeout.connect(on_tick)
+    tick.start()
+
+    def finish() -> None:
+        tick.stop()
+        splash.update_progress(100.0, state["phase"], "Готово")
+        window = MainWindow()
+        app.main_window = window  # type: ignore[attr-defined] - держим ссылку живой
+        window.show()
+        splash.finish(window)
+
+    QTimer.singleShot(1500, finish)
     return app.exec()

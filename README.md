@@ -22,6 +22,7 @@
   температуру CPU и обороты вентиляторов через WMI) и кнопка повышения прав администратора
   (нужны для части датчиков).
 - **Светлая и тёмная темы** — переключаются иконкой луны в правом верхнем углу, выбор сохраняется.
+- **Анимированный экран загрузки** и собственная иконка приложения.
 
 ### Модули оптимизации
 Первые четыре модуля объединены в одну страницу **«Оптимизация»** с переключателем
@@ -116,11 +117,24 @@ app/
 - Очистка standby-списка и отключение служб могут временно замедлить систему — применяйте
   осознанно.
 
-## Сборка в один .exe (необязательно)
+## Сборка .exe
+
+Готовый файл собирается одним скриптом:
 
 ```powershell
-python -m pip install pyinstaller
-pyinstaller --noconfirm --windowed --name OptimizerGame --collect-all PySide6 main.py
+build.bat
 ```
 
-Готовый файл появится в `dist/OptimizerGame/`.
+Он устанавливает PyInstaller, генерирует иконку (`assets/make_icon.py`) и собирает
+`dist\OptimizerGame.exe` (один файл) по спецификации `OptimizerGame.spec`.
+
+Вручную:
+
+```powershell
+python -m pip install pyinstaller pillow
+python assets/make_icon.py
+pyinstaller --noconfirm --clean OptimizerGame.spec
+```
+
+При запуске показывается анимированный экран загрузки, а иконка `assets/icon.ico`
+используется для окна и самого `.exe`.
