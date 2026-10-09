@@ -1,46 +1,58 @@
-"""Темы оформления приложения: тёмная («киберпанк-минимализм») и светлая.
+"""Темы оформления в стиле Windows 11 (Fluent Design).
 
-Палитры описаны словарями, QSS-шаблон подставляет цвета через ``str.format``.
-Переключение делается в рантайме: ``set_current`` + ``styles()``.
+Две палитры — светлая и тёмная, как в Windows 11. QSS-шаблон подставляет цвета
+через ``str.format``; галочки чекбоксов берутся из PNG-ресурсов.
 """
 from __future__ import annotations
 
-MONO = '"Cascadia Mono", "Consolas", "JetBrains Mono", "Courier New", monospace'
+import os
 
-DARK = {
-    "MONO": MONO,
-    "BG": "#06070c",
-    "BG_ALT": "#0a0c13",
-    "PANEL": "#0d1019",
-    "BORDER": "#1b2130",
-    "ACCENT": "#22e0ff",
-    "ACCENT_DIM": "#12a7c4",
-    "MAGENTA": "#ff2e97",
-    "TEXT": "#d9e6ee",
-    "TEXT_DIM": "#5d7484",
-    "TEXT_FAINT": "#33414d",
-    "ON_ACCENT": "#04060a",
-    "DANGER": "#ff3d5a",
-    "WARN": "#f5d90a",
-    "OK": "#39ff9e",
-}
+from ..utils import resource_path
+
+FONT = '"Segoe UI Variable Text", "Segoe UI", "Verdana", sans-serif'
 
 LIGHT = {
-    "MONO": MONO,
-    "BG": "#eef1f5",
-    "BG_ALT": "#e2e8ef",
+    "NAME": "light",
+    "MONO": FONT,
+    "BG": "#f3f3f3",
+    "BG_ALT": "#ececec",
     "PANEL": "#ffffff",
-    "BORDER": "#c9d4df",
-    "ACCENT": "#0a7ea4",
-    "ACCENT_DIM": "#086685",
-    "MAGENTA": "#b0197a",
-    "TEXT": "#16202a",
-    "TEXT_DIM": "#5c6b79",
-    "TEXT_FAINT": "#9aa7b3",
+    "BORDER": "#e0e0e0",
+    "CONTROL": "#fdfdfd",
+    "CONTROL_HOVER": "#f5f5f5",
+    "CONTROL_PRESSED": "#ededed",
+    "ACCENT": "#0067c0",
+    "ACCENT_DIM": "#005ba1",
+    "MAGENTA": "#c239b3",
+    "TEXT": "#1b1b1b",
+    "TEXT_DIM": "#5f5f5f",
+    "TEXT_FAINT": "#9b9b9b",
     "ON_ACCENT": "#ffffff",
-    "DANGER": "#c62828",
-    "WARN": "#a86e00",
-    "OK": "#177a48",
+    "DANGER": "#c42b1c",
+    "WARN": "#9d5d00",
+    "OK": "#0f7b0f",
+}
+
+DARK = {
+    "NAME": "dark",
+    "MONO": FONT,
+    "BG": "#202020",
+    "BG_ALT": "#1c1c1c",
+    "PANEL": "#2b2b2b",
+    "BORDER": "#3d3d3d",
+    "CONTROL": "#2d2d2d",
+    "CONTROL_HOVER": "#333333",
+    "CONTROL_PRESSED": "#292929",
+    "ACCENT": "#60cdff",
+    "ACCENT_DIM": "#4cc2ff",
+    "MAGENTA": "#ff2e97",
+    "TEXT": "#ffffff",
+    "TEXT_DIM": "#c9c9c9",
+    "TEXT_FAINT": "#8a8a8a",
+    "ON_ACCENT": "#003a5c",
+    "DANGER": "#ff99a4",
+    "WARN": "#fce100",
+    "OK": "#6ccb5f",
 }
 
 PALETTES = {"dark": DARK, "light": LIGHT}
@@ -71,8 +83,13 @@ def risk_colors(mode: str | None = None) -> dict[str, str]:
     return {"low": p["OK"], "medium": p["WARN"], "high": p["DANGER"]}
 
 
-# Для обратной совместимости (тёмная тема).
 RISK_COLORS = risk_colors("dark")
+
+
+def _check_icon(dark: bool) -> str:
+    name = "check_dark.png" if dark else "check_white.png"
+    return resource_path(os.path.join("assets", name)).replace("\\", "/")
+
 
 _TEMPLATE = """
     * {{
@@ -98,14 +115,14 @@ _TEMPLATE = """
         border-right: 1px solid {BORDER};
     }}
     QLabel#AppTitle {{
-        font-size: 16px;
-        font-weight: 700;
-        color: {ACCENT};
-        padding: 20px 16px 12px 16px;
+        font-size: 15px;
+        font-weight: 600;
+        color: {TEXT};
+        padding: 18px 16px 8px 18px;
     }}
     QLabel#PageTitle {{
-        font-size: 20px;
-        font-weight: 700;
+        font-size: 22px;
+        font-weight: 600;
         color: {TEXT};
     }}
     QLabel#PageHint {{
@@ -114,12 +131,12 @@ _TEMPLATE = """
     }}
     QLabel#Value {{
         color: {TEXT};
-        font-size: 14px;
+        font-size: 13px;
         font-weight: 600;
     }}
     QLabel#Caption {{
         color: {TEXT_DIM};
-        font-size: 11px;
+        font-size: 12px;
     }}
     QFrame#AccentLine {{
         background: {ACCENT};
@@ -130,58 +147,56 @@ _TEMPLATE = """
         background: transparent;
         border: none;
         outline: none;
-        padding: 6px;
+        padding: 4px 8px;
     }}
     QListWidget#Nav::item {{
-        padding: 9px 10px;
-        border-left: 2px solid transparent;
-        color: {TEXT_DIM};
+        padding: 9px 12px;
+        margin: 2px 0;
+        border-radius: 5px;
+        border-left: 3px solid transparent;
+        color: {TEXT};
     }}
     QListWidget#Nav::item:hover {{
-        color: {TEXT};
-        background: {PANEL};
+        background: {CONTROL_HOVER};
     }}
     QListWidget#Nav::item:selected {{
-        color: {ACCENT};
-        border-left: 2px solid {ACCENT};
-        background: {PANEL};
+        background: {CONTROL_PRESSED};
+        border-left: 3px solid {ACCENT};
         font-weight: 600;
     }}
 
     QFrame#Card {{
         background: {PANEL};
         border: 1px solid {BORDER};
-        border-left: 2px solid {ACCENT};
-        border-radius: 2px;
+        border-radius: 8px;
     }}
     QFrame#Card QLabel#CardTitle {{
-        color: {ACCENT};
-        font-size: 12px;
-        font-weight: 700;
+        color: {TEXT};
+        font-size: 13px;
+        font-weight: 600;
     }}
 
     QLabel#Badge {{
-        border-radius: 2px;
-        padding: 2px 7px;
-        font-size: 10px;
-        font-weight: 700;
+        border-radius: 4px;
+        padding: 2px 8px;
+        font-size: 11px;
+        font-weight: 600;
     }}
 
     QPushButton {{
-        background: qlineargradient(x1:0, y1:0, x2:0, y2:1, stop:0 {PANEL}, stop:1 {BG_ALT});
+        background: {CONTROL};
         border: 1px solid {BORDER};
-        border-radius: 9px;
-        padding: 9px 18px;
+        border-radius: 5px;
+        padding: 7px 16px;
         color: {TEXT};
+        min-height: 18px;
     }}
     QPushButton:hover {{
-        border-color: {ACCENT};
-        color: {ACCENT};
+        background: {CONTROL_HOVER};
     }}
     QPushButton:pressed {{
-        background: {BG};
-        border-color: {ACCENT_DIM};
-        color: {ACCENT_DIM};
+        background: {CONTROL_PRESSED};
+        color: {TEXT_DIM};
     }}
     QPushButton:disabled {{
         background: transparent;
@@ -189,54 +204,52 @@ _TEMPLATE = """
         border-color: {BORDER};
     }}
     QPushButton#Primary {{
-        background: qlineargradient(x1:0, y1:0, x2:0, y2:1, stop:0 {ACCENT}, stop:1 {ACCENT_DIM});
-        border: 1px solid {ACCENT};
-        border-radius: 9px;
-        padding: 9px 20px;
+        background: {ACCENT};
+        border: 1px solid transparent;
+        border-radius: 5px;
+        padding: 7px 18px;
         color: {ON_ACCENT};
-        font-weight: 700;
+        font-weight: 600;
     }}
     QPushButton#Primary:hover {{
-        background: {ACCENT};
-        border-color: {ACCENT};
+        background: {ACCENT_DIM};
         color: {ON_ACCENT};
     }}
     QPushButton#Primary:pressed {{
         background: {ACCENT_DIM};
-        border-color: {ACCENT_DIM};
         color: {ON_ACCENT};
     }}
     QPushButton#Primary:disabled {{
-        background: {PANEL};
+        background: {CONTROL};
         border-color: {BORDER};
         color: {TEXT_FAINT};
     }}
     QPushButton#Danger {{
         background: transparent;
         color: {DANGER};
-        border-color: {DANGER};
+        border: 1px solid {BORDER};
     }}
     QPushButton#Danger:hover {{
-        background: {DANGER};
+        background: {CONTROL_HOVER};
         border-color: {DANGER};
-        color: {ON_ACCENT};
+        color: {DANGER};
     }}
     QPushButton#Segment {{
-        background: {BG_ALT};
+        background: {CONTROL};
         border: 1px solid {BORDER};
-        border-radius: 16px;
-        padding: 7px 18px;
-        color: {TEXT_DIM};
-        font-weight: 600;
+        border-radius: 5px;
+        padding: 6px 14px;
+        color: {TEXT};
+        font-weight: 500;
     }}
     QPushButton#Segment:hover {{
-        color: {TEXT};
-        border-color: {ACCENT};
+        background: {CONTROL_HOVER};
     }}
     QPushButton#Segment:checked {{
         background: {ACCENT};
         border-color: {ACCENT};
         color: {ON_ACCENT};
+        font-weight: 600;
     }}
     QPushButton#Segment:checked:hover {{
         background: {ACCENT_DIM};
@@ -245,119 +258,123 @@ _TEMPLATE = """
     }}
 
     QProgressBar {{
-        background: {BG};
-        border: 1px solid {BORDER};
-        border-radius: 2px;
-        height: 14px;
+        background: {CONTROL};
+        border: none;
+        border-radius: 3px;
+        height: 6px;
         text-align: center;
         color: {TEXT_DIM};
         font-size: 10px;
     }}
     QProgressBar::chunk {{
         background: {ACCENT};
+        border-radius: 3px;
     }}
 
     QLineEdit, QComboBox, QSpinBox {{
-        background: {PANEL};
+        background: {CONTROL};
         border: 1px solid {BORDER};
-        border-radius: 2px;
+        border-radius: 4px;
         padding: 6px 10px;
         color: {TEXT};
+        selection-background-color: {ACCENT};
+        selection-color: {ON_ACCENT};
+    }}
+    QLineEdit:hover, QComboBox:hover {{
+        background: {CONTROL_HOVER};
     }}
     QLineEdit:focus, QComboBox:focus, QSpinBox:focus {{
-        border-color: {ACCENT};
+        border-bottom: 2px solid {ACCENT};
     }}
     QComboBox::drop-down {{
         border: none;
-        width: 18px;
+        width: 24px;
     }}
     QComboBox QAbstractItemView {{
         background: {PANEL};
-        border: 1px solid {ACCENT};
-        selection-background-color: {ACCENT};
-        selection-color: {ON_ACCENT};
+        border: 1px solid {BORDER};
+        border-radius: 6px;
+        padding: 4px;
+        selection-background-color: {CONTROL_HOVER};
+        selection-color: {TEXT};
         outline: none;
     }}
 
     QTableWidget, QTableWidget QTableCornerButton::section {{
         background: {PANEL};
         border: 1px solid {BORDER};
-        border-radius: 2px;
-        gridline-color: {BORDER};
+        border-radius: 8px;
+        gridline-color: transparent;
         selection-background-color: {ACCENT};
         selection-color: {ON_ACCENT};
         alternate-background-color: {BG_ALT};
         outline: none;
     }}
     QTableWidget::item {{
-        padding: 4px;
+        padding: 6px 8px;
     }}
     QTableView::indicator {{
-        width: 14px;
-        height: 14px;
-        border: 1px solid {BORDER};
-        border-radius: 1px;
-        background: {BG};
+        width: 16px;
+        height: 16px;
+        border: 1px solid {TEXT_DIM};
+        border-radius: 4px;
+        background: transparent;
+    }}
+    QTableView::indicator:hover {{
+        border-color: {ACCENT};
     }}
     QTableView::indicator:checked {{
         background: {ACCENT};
         border-color: {ACCENT};
+        image: url("{CHECK}");
     }}
     QHeaderView::section {{
-        background: {BG_ALT};
+        background: transparent;
         border: none;
-        border-right: 1px solid {BORDER};
-        border-bottom: 1px solid {ACCENT};
+        border-bottom: 1px solid {BORDER};
         padding: 8px;
         color: {TEXT_DIM};
-        font-weight: 700;
+        font-weight: 600;
     }}
 
     QPlainTextEdit {{
-        background: {BG};
+        background: {PANEL};
         border: 1px solid {BORDER};
-        border-radius: 2px;
-        padding: 6px;
+        border-radius: 6px;
+        padding: 8px;
         color: {TEXT_DIM};
         font-size: 12px;
     }}
 
     QScrollBar:vertical {{
         background: transparent;
-        width: 10px;
+        width: 12px;
         margin: 2px;
     }}
     QScrollBar::handle:vertical {{
         background: {BORDER};
-        border-radius: 1px;
-        min-height: 30px;
+        border-radius: 3px;
+        min-height: 24px;
     }}
     QScrollBar::handle:vertical:hover {{
-        background: {ACCENT_DIM};
+        background: {TEXT_FAINT};
     }}
     QScrollBar:horizontal {{
         background: transparent;
-        height: 10px;
+        height: 12px;
         margin: 2px;
     }}
     QScrollBar::handle:horizontal {{
         background: {BORDER};
-        border-radius: 1px;
-        min-width: 30px;
+        border-radius: 3px;
+        min-width: 24px;
     }}
     QScrollBar::handle:horizontal:hover {{
-        background: {ACCENT_DIM};
+        background: {TEXT_FAINT};
     }}
     QScrollBar::add-line, QScrollBar::sub-line {{
         height: 0;
         width: 0;
-    }}
-
-    QStatusBar {{
-        background: {BG_ALT};
-        border-top: 1px solid {BORDER};
-        color: {TEXT_DIM};
-        font-size: 11px;
     }}
 
     QCheckBox {{
@@ -365,11 +382,11 @@ _TEMPLATE = """
         color: {TEXT};
     }}
     QCheckBox::indicator {{
-        width: 14px;
-        height: 14px;
-        border: 1px solid {BORDER};
-        border-radius: 1px;
-        background: {BG};
+        width: 18px;
+        height: 18px;
+        border: 1px solid {TEXT_DIM};
+        border-radius: 4px;
+        background: transparent;
     }}
     QCheckBox::indicator:hover {{
         border-color: {ACCENT};
@@ -377,16 +394,20 @@ _TEMPLATE = """
     QCheckBox::indicator:checked {{
         background: {ACCENT};
         border-color: {ACCENT};
+        image: url("{CHECK}");
     }}
 
     QToolTip {{
         background: {PANEL};
         color: {TEXT};
-        border: 1px solid {ACCENT};
-        padding: 4px;
+        border: 1px solid {BORDER};
+        border-radius: 4px;
+        padding: 6px 8px;
     }}
 """
 
 
 def styles(mode: str | None = None) -> str:
-    return _TEMPLATE.format(**palette(mode))
+    p = dict(palette(mode))
+    p["CHECK"] = _check_icon(p.get("NAME") == "dark")
+    return _TEMPLATE.format(**p)

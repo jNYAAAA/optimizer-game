@@ -49,20 +49,20 @@ class SplashScreen(QSplashScreen):
         painter.setBrush(QColor(colors["BG"]))
         painter.drawRoundedRect(QRectF(1.5, 1.5, width - 3, height - 3), 16, 16)
 
-        # Верхняя акцентная линия с бегущим сегментом
+        # Верхняя линия с бегущим акцентом
         painter.setPen(Qt.NoPen)
-        painter.setBrush(QColor(colors["ACCENT"]))
+        painter.setBrush(QColor(colors["BORDER"]))
         painter.drawRect(QRectF(1.5, 1.5, width - 3, 2))
         segment = 100.0
         position = (math.sin(self._phase) * 0.5 + 0.5) * (width - segment)
-        painter.setBrush(QColor(colors["MAGENTA"]))
+        painter.setBrush(QColor(colors["ACCENT"]))
         painter.drawRect(QRectF(position, 1.5, segment, 2))
 
         # Логотип-луна
         self._draw_moon(painter, QRectF(48, 62, 84, 84), colors["ACCENT"])
 
         # Заголовок и подзаголовок
-        title_font = QFont("Consolas", 21)
+        title_font = QFont("Segoe UI", 22)
         title_font.setBold(True)
         painter.setFont(title_font)
         painter.setPen(QColor(colors["ACCENT"]))
@@ -72,12 +72,12 @@ class SplashScreen(QSplashScreen):
             APP_DISPLAY_NAME.upper(),
         )
 
-        painter.setFont(QFont("Consolas", 10))
+        painter.setFont(QFont("Segoe UI", 10))
         painter.setPen(QColor(colors["TEXT_DIM"]))
         painter.drawText(
             QRectF(154, 96, width - 200, 22),
             Qt.AlignLeft | Qt.AlignVCenter,
-            "характеристики // оптимизация windows",
+            "характеристики · оптимизация Windows",
         )
 
         # Прогресс
@@ -103,7 +103,7 @@ class SplashScreen(QSplashScreen):
             )
 
         # Статус и версия
-        painter.setFont(QFont("Consolas", 9))
+        painter.setFont(QFont("Segoe UI", 9))
         painter.setPen(QColor(colors["TEXT_DIM"]))
         painter.drawText(
             QRectF(48, 232, width - 96, 20), Qt.AlignLeft | Qt.AlignVCenter, self._message
