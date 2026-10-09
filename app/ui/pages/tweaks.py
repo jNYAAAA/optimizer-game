@@ -100,11 +100,17 @@ class TweaksPage(QWidget):
         root.addWidget(self.table, 1)
 
         controls = QHBoxLayout()
-        self.refresh_btn = QPushButton("Обновить")
+        self.refresh_btn = QPushButton("ОБНОВИТЬ")
         self.refresh_btn.clicked.connect(self.load)
         controls.addWidget(self.refresh_btn)
+        self.select_all_btn = QPushButton("ВЫБРАТЬ ВСЁ")
+        self.select_all_btn.clicked.connect(lambda: self._set_all(True))
+        controls.addWidget(self.select_all_btn)
+        self.deselect_all_btn = QPushButton("СНЯТЬ ВСЁ")
+        self.deselect_all_btn.clicked.connect(lambda: self._set_all(False))
+        controls.addWidget(self.deselect_all_btn)
         controls.addStretch(1)
-        self.apply_btn = QPushButton("Применить изменения")
+        self.apply_btn = QPushButton("ПРИМЕНИТЬ")
         self.apply_btn.setObjectName("Primary")
         self.apply_btn.clicked.connect(self._apply)
         controls.addWidget(self.apply_btn)
@@ -198,6 +204,11 @@ class TweaksPage(QWidget):
         self.progress.setRange(0, 100)
         self.progress.setValue(100)
         self._render()
+
+    def _set_all(self, checked: bool) -> None:
+        state = Qt.Checked if checked else Qt.Unchecked
+        for row in range(self.table.rowCount()):
+            self.table.item(row, 0).setCheckState(state)
 
     def _actions(self) -> list[tuple[Tweak, str]]:
         actions: list[tuple[Tweak, str]] = []

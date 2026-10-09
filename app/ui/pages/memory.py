@@ -48,7 +48,7 @@ class MemoryPage(QWidget):
         self.standby_check.setChecked(True)
         controls.addWidget(self.standby_check)
         controls.addStretch(1)
-        self.run_btn = QPushButton("Оптимизировать память")
+        self.run_btn = QPushButton("ОПТИМИЗИРОВАТЬ ПАМЯТЬ")
         self.run_btn.setObjectName("Primary")
         self.run_btn.clicked.connect(self._run)
         controls.addWidget(self.run_btn)

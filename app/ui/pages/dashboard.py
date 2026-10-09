@@ -122,7 +122,7 @@ class DashboardPage(QWidget):
         self.sensors_card.add_row("Статус", "Чтение датчиков…")
 
         self._lhm_mode = "download"
-        self.lhm_btn = QPushButton("LibreHardwareMonitor")
+        self.lhm_btn = QPushButton("LHM")
         self.lhm_btn.setToolTip(
             "LibreHardwareMonitor открывает температуру CPU и обороты вентиляторов через WMI"
         )
@@ -327,16 +327,16 @@ class DashboardPage(QWidget):
     def _update_lhm_button(self, active: bool) -> None:
         if active:
             self._lhm_mode = "active"
-            self.lhm_btn.setText("LHM активен")
+            self.lhm_btn.setText("LHM АКТИВЕН")
             self.lhm_btn.setEnabled(False)
             return
         self.lhm_btn.setEnabled(True)
         if find_hardware_monitor():
             self._lhm_mode = "launch"
-            self.lhm_btn.setText("Запустить LHM")
+            self.lhm_btn.setText("ЗАПУСТИТЬ LHM")
         else:
             self._lhm_mode = "download"
-            self.lhm_btn.setText("Скачать LHM")
+            self.lhm_btn.setText("СКАЧАТЬ LHM")
 
     def _on_lhm_clicked(self) -> None:
         if self._lhm_mode == "launch":

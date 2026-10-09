@@ -168,19 +168,20 @@ _TEMPLATE = """
     }}
 
     QPushButton {{
-        background: {PANEL};
+        background: qlineargradient(x1:0, y1:0, x2:0, y2:1, stop:0 {PANEL}, stop:1 {BG_ALT});
         border: 1px solid {BORDER};
-        border-radius: 8px;
-        padding: 8px 16px;
+        border-radius: 9px;
+        padding: 9px 18px;
         color: {TEXT};
     }}
     QPushButton:hover {{
-        background: {BG_ALT};
         border-color: {ACCENT};
         color: {ACCENT};
     }}
     QPushButton:pressed {{
         background: {BG};
+        border-color: {ACCENT_DIM};
+        color: {ACCENT_DIM};
     }}
     QPushButton:disabled {{
         background: transparent;
@@ -188,19 +189,22 @@ _TEMPLATE = """
         border-color: {BORDER};
     }}
     QPushButton#Primary {{
-        background: {ACCENT};
+        background: qlineargradient(x1:0, y1:0, x2:0, y2:1, stop:0 {ACCENT}, stop:1 {ACCENT_DIM});
         border: 1px solid {ACCENT};
-        border-radius: 8px;
+        border-radius: 9px;
+        padding: 9px 20px;
         color: {ON_ACCENT};
         font-weight: 700;
     }}
     QPushButton#Primary:hover {{
-        background: {ACCENT_DIM};
-        border-color: {ACCENT_DIM};
+        background: {ACCENT};
+        border-color: {ACCENT};
         color: {ON_ACCENT};
     }}
     QPushButton#Primary:pressed {{
         background: {ACCENT_DIM};
+        border-color: {ACCENT_DIM};
+        color: {ON_ACCENT};
     }}
     QPushButton#Primary:disabled {{
         background: {PANEL};

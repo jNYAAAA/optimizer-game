@@ -53,14 +53,14 @@ class StartupPage(QWidget):
         self.items: list[StartupItem] = []
 
         controls = QHBoxLayout()
-        self.refresh_btn = QPushButton("Обновить")
+        self.refresh_btn = QPushButton("ОБНОВИТЬ")
         self.refresh_btn.clicked.connect(self.load)
         controls.addWidget(self.refresh_btn)
-        self.restore_btn = QPushButton("Восстановить отключённые")
+        self.restore_btn = QPushButton("ВОССТАНОВИТЬ")
         self.restore_btn.clicked.connect(self._restore_all)
         controls.addWidget(self.restore_btn)
         controls.addStretch(1)
-        self.apply_btn = QPushButton("Применить изменения")
+        self.apply_btn = QPushButton("ПРИМЕНИТЬ")
         self.apply_btn.setObjectName("Primary")
         self.apply_btn.clicked.connect(self._apply)
         controls.addWidget(self.apply_btn)

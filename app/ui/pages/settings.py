@@ -26,7 +26,7 @@ class SettingsPage(QWidget):
             "Настройки, резервные копии отключённой автозагрузки и изменённых твиков.",
         )
         buttons = QHBoxLayout()
-        open_btn = QPushButton("Открыть папку данных")
+        open_btn = QPushButton("ОТКРЫТЬ ПАПКУ ДАННЫХ")
         open_btn.clicked.connect(lambda: open_path(app_data_dir()))
         buttons.addWidget(open_btn)
         buttons.addStretch(1)
