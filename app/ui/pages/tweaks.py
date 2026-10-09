@@ -1,4 +1,8 @@
-"""Твики реестра и сети с возможностью отката."""
+"""Твики реестра, сети и служб с возможностью отката.
+
+Твики сгруппированы по вкладкам-категориям (плюс «Все»), чтобы их было удобно
+фильтровать.
+"""
 from __future__ import annotations
 
 from PySide6.QtCore import Qt, QThreadPool
@@ -22,13 +26,32 @@ from ...core.workers import Worker, start_worker
 from ..theme import risk_colors
 from ..widgets import LogView, make_header
 
+_ALL = "Все"
+_CATEGORY_ORDER = [
+    "Производительность",
+    "Приватность",
+    "Интерфейс",
+    "Сеть и протоколы",
+    "Службы",
+    "Игры",
+]
+_TAB_LABELS = {
+    "Все": "ВСЕ",
+    "Производительность": "СКОРОСТЬ",
+    "Приватность": "ПРИВАТНОСТЬ",
+    "Интерфейс": "ИНТЕРФЕЙС",
+    "Сеть и протоколы": "СЕТЬ",
+    "Службы": "СЛУЖБЫ",
+    "Игры": "ИГРЫ",
+}
+
 
 class TweaksPage(QWidget):
     def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__(parent)
         root = QVBoxLayout(self)
         root.setContentsMargins(24, 20, 24, 20)
-        root.setSpacing(14)
+        root.setSpacing(12)
 
         root.addWidget(
             make_header(
@@ -40,6 +63,27 @@ class TweaksPage(QWidget):
         )
 
         self.tweaks: list[Tweak] = build_tweaks()
+        self.applied: dict[str, bool] = {}
+        self._visible: list[Tweak] = []
+        self._category = _ALL
+
+        # Переключатель категорий
+        segment = QHBoxLayout()
+        segment.setSpacing(8)
+        self._buttons: dict[str, QPushButton] = {}
+        for category in self._tabs():
+            button = QPushButton(_TAB_LABELS.get(category, category.upper()))
+            button.setObjectName("Segment")
+            button.setCheckable(True)
+            button.setCursor(Qt.PointingHandCursor)
+            button.setToolTip(category)
+            button.clicked.connect(
+                lambda _checked=False, cat=category: self._select_category(cat)
+            )
+            segment.addWidget(button)
+            self._buttons[category] = button
+        segment.addStretch(1)
+        root.addLayout(segment)
 
         self.table = QTableWidget(0, 5)
         self.table.setHorizontalHeaderLabels(["", "Твик", "Категория", "Риск", "Описание"])
@@ -79,13 +123,59 @@ class TweaksPage(QWidget):
         self.log.setMaximumHeight(120)
         root.addWidget(self.log)
 
-        self.applied: dict[str, bool] = {}
         self._loaded = False
+        self._select_category(_ALL)
+
+    # ------------------------------------------------------------------
+    def _tabs(self) -> list[str]:
+        present: list[str] = []
+        for tweak in self.tweaks:
+            if tweak.category not in present:
+                present.append(tweak.category)
+        tabs = [_ALL]
+        for category in _CATEGORY_ORDER:
+            if category in present:
+                tabs.append(category)
+        for category in present:
+            if category not in tabs:
+                tabs.append(category)
+        return tabs
+
+    def _select_category(self, category: str) -> None:
+        self._category = category
+        for cat, button in self._buttons.items():
+            button.setChecked(cat == category)
+        self._render()
+
+    def _render(self) -> None:
+        if self._category == _ALL:
+            visible = list(self.tweaks)
+        else:
+            visible = [tweak for tweak in self.tweaks if tweak.category == self._category]
+        self._visible = visible
+
+        colors = risk_colors()
+        self.table.setRowCount(0)
+        for tweak in visible:
+            row = self.table.rowCount()
+            self.table.insertRow(row)
+            check = QTableWidgetItem()
+            check.setFlags(Qt.ItemIsUserCheckable | Qt.ItemIsEnabled)
+            check.setCheckState(Qt.Checked if self.applied.get(tweak.key) else Qt.Unchecked)
+            self.table.setItem(row, 0, check)
+            self.table.setItem(row, 1, QTableWidgetItem(tweak.name))
+            self.table.setItem(row, 2, QTableWidgetItem(tweak.category))
+            risk_item = QTableWidgetItem(tweak.risk_label)
+            risk_item.setForeground(QBrush(QColor(colors.get(tweak.risk, "#98a2b3"))))
+            self.table.setItem(row, 3, risk_item)
+            self.table.setItem(row, 4, QTableWidgetItem(tweak.description))
+
+        applied_count = sum(1 for tweak in visible if self.applied.get(tweak.key))
+        self.status.setText(f"Применено твиков: {applied_count} из {len(visible)}")
 
     # ------------------------------------------------------------------
     def on_theme_changed(self) -> None:
-        if self.applied:
-            self._on_applied_state(self.applied)
+        self._render()
 
     def showEvent(self, event) -> None:  # noqa: N802 - Qt API
         super().showEvent(event)
@@ -107,26 +197,11 @@ class TweaksPage(QWidget):
         self.refresh_btn.setEnabled(True)
         self.progress.setRange(0, 100)
         self.progress.setValue(100)
-        self.table.setRowCount(0)
-        for tweak in self.tweaks:
-            row = self.table.rowCount()
-            self.table.insertRow(row)
-            check = QTableWidgetItem()
-            check.setFlags(Qt.ItemIsUserCheckable | Qt.ItemIsEnabled)
-            check.setCheckState(Qt.Checked if applied.get(tweak.key) else Qt.Unchecked)
-            self.table.setItem(row, 0, check)
-            self.table.setItem(row, 1, QTableWidgetItem(tweak.name))
-            self.table.setItem(row, 2, QTableWidgetItem(tweak.category))
-            risk_item = QTableWidgetItem(tweak.risk_label)
-            risk_item.setForeground(QBrush(QColor(risk_colors().get(tweak.risk, "#98a2b3"))))
-            self.table.setItem(row, 3, risk_item)
-            self.table.setItem(row, 4, QTableWidgetItem(tweak.description))
-        applied_count = sum(1 for value in applied.values() if value)
-        self.status.setText(f"Применено твиков: {applied_count} из {len(self.tweaks)}")
+        self._render()
 
     def _actions(self) -> list[tuple[Tweak, str]]:
         actions: list[tuple[Tweak, str]] = []
-        for row, tweak in enumerate(self.tweaks):
+        for row, tweak in enumerate(self._visible):
             desired = self.table.item(row, 0).checkState() == Qt.Checked
             current = self.applied.get(tweak.key, False)
             if desired and not current:

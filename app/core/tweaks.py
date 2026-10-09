@@ -496,7 +496,7 @@ def build_tweaks() -> list[Tweak]:
             key="telemetry",
             name="Отключить телеметрию",
             description="Запрещает сбор диагностических данных и отключает службы телеметрии.",
-            category="Конфиденциальность",
+            category="Приватность",
             risk="low",
             requires_admin=True,
             writes=[
@@ -524,7 +524,7 @@ def build_tweaks() -> list[Tweak]:
             key="visual_effects",
             name="Максимальное быстродействие",
             description="Отключает анимации и визуальные эффекты Windows.",
-            category="Интерфейс",
+            category="Производительность",
             risk="low",
             writes=[
                 RegWrite(
@@ -540,7 +540,7 @@ def build_tweaks() -> list[Tweak]:
             key="menu_show_delay",
             name="Ускорить появление меню",
             description="Убирает задержку при раскрытии меню.",
-            category="Интерфейс",
+            category="Производительность",
             risk="low",
             writes=[
                 RegWrite("HKCU", r"Control Panel\Desktop", "MenuShowDelay", "REG_SZ", "0")
@@ -550,7 +550,7 @@ def build_tweaks() -> list[Tweak]:
             key="startup_delay",
             name="Ускорить запуск приложений",
             description="Отключает искусственную задержку стартовых приложений Explorer.",
-            category="Интерфейс",
+            category="Производительность",
             risk="low",
             writes=[
                 RegWrite(
@@ -566,7 +566,7 @@ def build_tweaks() -> list[Tweak]:
             key="network_throttling",
             name="Отключить сетевой троттлинг",
             description="Отключает ограничение пропускной способности сети для мультимедиа.",
-            category="Сеть",
+            category="Сеть и протоколы",
             risk="medium",
             requires_admin=True,
             writes=[
@@ -590,7 +590,7 @@ def build_tweaks() -> list[Tweak]:
             key="nagle",
             name="Отключить алгоритм Нейгла",
             description="Снижает задержку в сетевых играх (TcpAckFrequency и TCPNoDelay).",
-            category="Сеть",
+            category="Сеть и протоколы",
             risk="medium",
             requires_admin=True,
             apply_fn=_nagle_apply,
@@ -601,7 +601,7 @@ def build_tweaks() -> list[Tweak]:
             key="hibernation",
             name="Отключить гибернацию",
             description="Освобождает hiberfil.sys и место на системном диске.",
-            category="Система",
+            category="Производительность",
             risk="medium",
             requires_admin=True,
             apply_fn=_hibernation_apply,
@@ -631,7 +631,7 @@ def build_tweaks() -> list[Tweak]:
             key="cortana",
             name="Отключить Cortana и поиск Bing",
             description="Запрещает Cortana и подмешивание веб-результатов Bing в поиск.",
-            category="Конфиденциальность",
+            category="Приватность",
             risk="low",
             requires_admin=True,
             writes=[
@@ -695,7 +695,7 @@ def build_tweaks() -> list[Tweak]:
             key="show_extensions",
             name="Показывать расширения файлов",
             description="Включает отображение расширений в проводнике.",
-            category="Проводник",
+            category="Интерфейс",
             risk="low",
             writes=[
                 RegWrite(
@@ -711,7 +711,7 @@ def build_tweaks() -> list[Tweak]:
             key="advertising_id",
             name="Отключить рекламный идентификатор",
             description="Запрещает приложениям использовать идентификатор для рекламы.",
-            category="Конфиденциальность",
+            category="Приватность",
             risk="low",
             writes=[
                 RegWrite(
@@ -727,7 +727,7 @@ def build_tweaks() -> list[Tweak]:
             key="suggestions",
             name="Отключить советы и предложения",
             description="Убирает рекомендованные приложения и подсказки в меню «Пуск».",
-            category="Конфиденциальность",
+            category="Приватность",
             risk="low",
             writes=[
                 RegWrite(
@@ -771,7 +771,7 @@ def build_tweaks() -> list[Tweak]:
             key="feedback",
             name="Отключить запросы отзывов",
             description="Windows перестанет предлагать оставить отзыв.",
-            category="Конфиденциальность",
+            category="Приватность",
             risk="low",
             writes=[
                 RegWrite(
@@ -838,7 +838,7 @@ def build_tweaks() -> list[Tweak]:
             key="power_throttling",
             name="Отключить энерготроттлинг",
             description="Запрещает Windows ограничивать производительность фоновых задач.",
-            category="Система",
+            category="Производительность",
             risk="medium",
             requires_admin=True,
             writes=[
@@ -855,7 +855,7 @@ def build_tweaks() -> list[Tweak]:
             key="fast_shutdown",
             name="Ускорить завершение работы",
             description="Сокращает время ожидания служб при выключении.",
-            category="Система",
+            category="Производительность",
             risk="medium",
             requires_admin=True,
             writes=[
@@ -912,7 +912,7 @@ def build_tweaks() -> list[Tweak]:
             key="telemetry_tasks",
             name="Отключить задачи телеметрии",
             description="Отключает запланированные задачи сбора диагностических данных.",
-            category="Конфиденциальность",
+            category="Приватность",
             risk="low",
             requires_admin=True,
             apply_fn=_telemetry_tasks_apply,
@@ -946,7 +946,7 @@ def build_tweaks() -> list[Tweak]:
             key="activity_history",
             name="Отключить историю действий",
             description="Выключает журнал активности и передачу его в облако.",
-            category="Конфиденциальность",
+            category="Приватность",
             risk="low",
             requires_admin=True,
             writes=[
@@ -959,7 +959,7 @@ def build_tweaks() -> list[Tweak]:
             key="tailored_experiences",
             name="Отключить персонализацию рекламы",
             description="Запрещает использование диагностических данных для персонализации.",
-            category="Конфиденциальность",
+            category="Приватность",
             risk="low",
             writes=[
                 RegWrite(
@@ -975,7 +975,7 @@ def build_tweaks() -> list[Tweak]:
             key="lock_screen_spotlight",
             name="Убрать рекламу с экрана блокировки",
             description="Отключает подсказки и «Windows Spotlight» на экране блокировки.",
-            category="Конфиденциальность",
+            category="Приватность",
             risk="low",
             writes=[
                 RegWrite(
@@ -1042,7 +1042,7 @@ def build_tweaks() -> list[Tweak]:
             key="recall",
             name="Отключить Windows Recall",
             description="Запрещает функцию Recall сохранять снимки экрана.",
-            category="Конфиденциальность",
+            category="Приватность",
             risk="low",
             requires_admin=True,
             writes=[
@@ -1059,7 +1059,7 @@ def build_tweaks() -> list[Tweak]:
             key="fast_startup",
             name="Отключить быстрый запуск",
             description="Выключает гибридную загрузку (hiberboot) — чище выключение и перезагрузка.",
-            category="Система",
+            category="Производительность",
             risk="medium",
             requires_admin=True,
             writes=[
@@ -1076,7 +1076,7 @@ def build_tweaks() -> list[Tweak]:
             key="delivery_p2p",
             name="Отключить P2P-раздачу обновлений",
             description="Запрещает отдавать обновления Windows другим компьютерам.",
-            category="Сеть",
+            category="Сеть и протоколы",
             risk="low",
             requires_admin=True,
             writes=[
@@ -1093,7 +1093,7 @@ def build_tweaks() -> list[Tweak]:
             key="qos_bandwidth",
             name="Снять резерв сети (QoS)",
             description="Освобождает зарезервированные под QoS 20% пропускной способности.",
-            category="Сеть",
+            category="Сеть и протоколы",
             risk="low",
             requires_admin=True,
             writes=[
@@ -1110,7 +1110,7 @@ def build_tweaks() -> list[Tweak]:
             key="llmnr",
             name="Отключить LLMNR",
             description="Выключает мультикаст-разрешение имён — меньше сетевого шума и рисков.",
-            category="Сеть",
+            category="Сеть и протоколы",
             risk="medium",
             requires_admin=True,
             writes=[
@@ -1234,7 +1234,7 @@ def build_tweaks() -> list[Tweak]:
             key="smb1",
             name="Отключить SMBv1",
             description="Убирает устаревший и небезопасный протокол SMB версии 1.",
-            category="Протоколы",
+            category="Сеть и протоколы",
             risk="medium",
             requires_admin=True,
             apply_fn=_smb1_apply,
@@ -1245,7 +1245,7 @@ def build_tweaks() -> list[Tweak]:
             key="smb_server",
             name="Отключить сервер SMB (общий доступ)",
             description="Выключает службу «Сервер» (LanmanServer) — доступ к вашим папкам по сети.",
-            category="Протоколы",
+            category="Сеть и протоколы",
             risk="medium",
             requires_admin=True,
             services=[ServiceChange("LanmanServer", "Disabled")],
@@ -1254,7 +1254,7 @@ def build_tweaks() -> list[Tweak]:
             key="smb_client",
             name="Отключить клиент SMB",
             description="Выключает службу «Рабочая станция» (LanmanWorkstation). Сетевые папки станут недоступны.",
-            category="Протоколы",
+            category="Сеть и протоколы",
             risk="high",
             requires_admin=True,
             services=[ServiceChange("LanmanWorkstation", "Disabled")],
@@ -1263,7 +1263,7 @@ def build_tweaks() -> list[Tweak]:
             key="netbios_helper",
             name="Отключить службу NetBIOS (TCP/IP Helper)",
             description="Выключает lmhosts — устаревшее разрешение имён NetBIOS.",
-            category="Протоколы",
+            category="Сеть и протоколы",
             risk="low",
             requires_admin=True,
             services=[ServiceChange("lmhosts", "Disabled")],
@@ -1272,7 +1272,7 @@ def build_tweaks() -> list[Tweak]:
             key="netbios_over_tcpip",
             name="Отключить NetBIOS over TCP/IP",
             description="Отключает NetBIOS на всех сетевых интерфейсах — меньше сетевого шума и рисков.",
-            category="Протоколы",
+            category="Сеть и протоколы",
             risk="medium",
             requires_admin=True,
             apply_fn=_netbios_apply,
@@ -1283,7 +1283,7 @@ def build_tweaks() -> list[Tweak]:
             key="ipv6_transition",
             name="Отключить переходные технологии IPv6",
             description="Выключает Teredo, 6to4 и ISATAP — не нужны при обычном IPv4/IPv6.",
-            category="Протоколы",
+            category="Сеть и протоколы",
             risk="low",
             requires_admin=True,
             apply_fn=_ipv6_transition_apply,

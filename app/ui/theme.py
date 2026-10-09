@@ -168,26 +168,29 @@ _TEMPLATE = """
     }}
 
     QPushButton {{
-        background: transparent;
+        background: {PANEL};
         border: 1px solid {BORDER};
-        border-radius: 2px;
-        padding: 8px 14px;
+        border-radius: 8px;
+        padding: 8px 16px;
         color: {TEXT};
     }}
     QPushButton:hover {{
+        background: {BG_ALT};
         border-color: {ACCENT};
         color: {ACCENT};
     }}
     QPushButton:pressed {{
-        background: {PANEL};
+        background: {BG};
     }}
     QPushButton:disabled {{
+        background: transparent;
         color: {TEXT_FAINT};
         border-color: {BORDER};
     }}
     QPushButton#Primary {{
         background: {ACCENT};
         border: 1px solid {ACCENT};
+        border-radius: 8px;
         color: {ON_ACCENT};
         font-weight: 700;
     }}
@@ -196,12 +199,16 @@ _TEMPLATE = """
         border-color: {ACCENT_DIM};
         color: {ON_ACCENT};
     }}
+    QPushButton#Primary:pressed {{
+        background: {ACCENT_DIM};
+    }}
     QPushButton#Primary:disabled {{
         background: {PANEL};
         border-color: {BORDER};
         color: {TEXT_FAINT};
     }}
     QPushButton#Danger {{
+        background: transparent;
         color: {DANGER};
         border-color: {DANGER};
     }}
@@ -211,10 +218,11 @@ _TEMPLATE = """
         color: {ON_ACCENT};
     }}
     QPushButton#Segment {{
-        padding: 7px 16px;
-        color: {TEXT_DIM};
+        background: {BG_ALT};
         border: 1px solid {BORDER};
-        background: transparent;
+        border-radius: 16px;
+        padding: 7px 18px;
+        color: {TEXT_DIM};
         font-weight: 600;
     }}
     QPushButton#Segment:hover {{
@@ -224,6 +232,11 @@ _TEMPLATE = """
     QPushButton#Segment:checked {{
         background: {ACCENT};
         border-color: {ACCENT};
+        color: {ON_ACCENT};
+    }}
+    QPushButton#Segment:checked:hover {{
+        background: {ACCENT_DIM};
+        border-color: {ACCENT_DIM};
         color: {ON_ACCENT};
     }}
 

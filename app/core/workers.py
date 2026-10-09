@@ -31,7 +31,15 @@ class Worker(QRunnable):
         self.signals = WorkerSignals()
 
     def _emit(self, percent: int, message: str = "") -> None:
-        self.signals.progress.emit(int(percent), str(message))
+        self._safe_emit(self.signals.progress, int(percent), str(message))
+
+    @staticmethod
+    def _safe_emit(signal, *args) -> None:
+        try:
+            signal.emit(*args)
+        except RuntimeError:
+            # Объект уже уничтожен (приложение завершается) — молча выходим.
+            pass
 
     def run(self) -> None:
         try:
@@ -40,9 +48,9 @@ class Worker(QRunnable):
             else:
                 result = self.fn(*self.args, **self.kwargs)
         except Exception as exc:  # noqa: BLE001 - сообщаем в UI
-            self.signals.failed.emit(f"{type(exc).__name__}: {exc}")
+            self._safe_emit(self.signals.failed, f"{type(exc).__name__}: {exc}")
         else:
-            self.signals.finished.emit(result)
+            self._safe_emit(self.signals.finished, result)
 
 
 # Пока задача выполняется (и пока не доставлены её сигналы) держим ссылку,
