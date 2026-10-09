@@ -189,7 +189,7 @@ def optimize_memory(clear_standby: bool = True, progress: ProgressFn = None) -> 
     if clear_standby:
         messages.append(
             "Список ожидания очищен" if standby_cleared
-            else "Список ожидания не очищен (нужны права администратора)"
+            else "Список ожидания не очищен"
         )
     if progress:
         progress(100, "Оптимизация памяти завершена")

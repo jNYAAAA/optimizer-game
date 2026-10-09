@@ -16,12 +16,11 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
-from ...admin import is_admin, relaunch_as_admin
 from ...core import services
 from ...core.tweaks import Tweak, apply_tweak, build_tweaks, evaluate_applied, revert_tweak
 from ...core.workers import Worker, start_worker
-from ..widgets import AdminBanner, LogView, make_header
 from ..theme import risk_colors
+from ..widgets import LogView, make_header
 
 
 class TweaksPage(QWidget):
@@ -39,10 +38,6 @@ class TweaksPage(QWidget):
                 "сохраняются автоматически.",
             )
         )
-
-        self.banner = AdminBanner()
-        self.banner.elevate_requested.connect(relaunch_as_admin)
-        root.addWidget(self.banner)
 
         self.tweaks: list[Tweak] = build_tweaks()
 
@@ -120,18 +115,12 @@ class TweaksPage(QWidget):
             check.setFlags(Qt.ItemIsUserCheckable | Qt.ItemIsEnabled)
             check.setCheckState(Qt.Checked if applied.get(tweak.key) else Qt.Unchecked)
             self.table.setItem(row, 0, check)
-            name_item = QTableWidgetItem(tweak.name)
-            if tweak.requires_admin and not is_admin():
-                name_item.setToolTip("Требуются права администратора")
-            self.table.setItem(row, 1, name_item)
+            self.table.setItem(row, 1, QTableWidgetItem(tweak.name))
             self.table.setItem(row, 2, QTableWidgetItem(tweak.category))
             risk_item = QTableWidgetItem(tweak.risk_label)
             risk_item.setForeground(QBrush(QColor(risk_colors().get(tweak.risk, "#98a2b3"))))
             self.table.setItem(row, 3, risk_item)
-            description = tweak.description
-            if tweak.requires_admin:
-                description += " (нужны права администратора)"
-            self.table.setItem(row, 4, QTableWidgetItem(description))
+            self.table.setItem(row, 4, QTableWidgetItem(tweak.description))
         applied_count = sum(1 for value in applied.values() if value)
         self.status.setText(f"Применено твиков: {applied_count} из {len(self.tweaks)}")
 

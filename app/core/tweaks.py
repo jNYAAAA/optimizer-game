@@ -258,14 +258,14 @@ def _hibernation_apply() -> tuple[bool, str]:
     code, output = run_command("powercfg /h off", timeout=60)
     if code == 0:
         return True, "Гибернация отключена"
-    return False, output or "Не удалось отключить гибернацию (нужны права администратора)"
+    return False, output or "Не удалось отключить гибернацию"
 
 
 def _hibernation_revert() -> tuple[bool, str]:
     code, output = run_command("powercfg /h on", timeout=60)
     if code == 0:
         return True, "Гибернация включена"
-    return False, output or "Не удалось включить гибернацию (нужны права администратора)"
+    return False, output or "Не удалось включить гибернацию"
 
 
 def _hibernation_applied(_mode_map: dict[str, str]) -> bool:
@@ -298,7 +298,7 @@ def _telemetry_tasks_apply() -> tuple[bool, str]:
             changed += 1
     if changed:
         return True, f"Отключено задач: {changed} из {len(_TELEMETRY_TASKS)}"
-    return False, "Не удалось изменить задачи (нужны права администратора)"
+    return False, "Не удалось изменить задачи"
 
 
 def _telemetry_tasks_revert() -> tuple[bool, str]:
@@ -309,7 +309,7 @@ def _telemetry_tasks_revert() -> tuple[bool, str]:
             changed += 1
     if changed:
         return True, f"Включено задач: {changed} из {len(_TELEMETRY_TASKS)}"
-    return False, "Не удалось изменить задачи (нужны права администратора)"
+    return False, "Не удалось изменить задачи"
 
 
 def _telemetry_tasks_applied(_mode_map: dict[str, str]) -> bool:
@@ -1098,10 +1098,10 @@ def build_tweaks() -> list[Tweak]:
             risk="low",
             requires_admin=True,
             apply_fn=lambda: _fsutil_set(
-                "disablelastaccess", 1, "Запись времени доступа отключена", "Не удалось изменить (нужны права администратора)"
+                "disablelastaccess", 1, "Запись времени доступа отключена", "Не удалось изменить"
             ),
             revert_fn=lambda: _fsutil_set(
-                "disablelastaccess", 0, "Запись времени доступа включена", "Не удалось изменить (нужны права администратора)"
+                "disablelastaccess", 0, "Запись времени доступа включена", "Не удалось изменить"
             ),
             is_applied_fn=lambda _m: _fsutil_is("disablelastaccess"),
         ),
@@ -1113,10 +1113,10 @@ def build_tweaks() -> list[Tweak]:
             risk="low",
             requires_admin=True,
             apply_fn=lambda: _fsutil_set(
-                "disable8dot3", 1, "Короткие имена отключены", "Не удалось изменить (нужны права администратора)"
+                "disable8dot3", 1, "Короткие имена отключены", "Не удалось изменить"
             ),
             revert_fn=lambda: _fsutil_set(
-                "disable8dot3", 0, "Короткие имена включены", "Не удалось изменить (нужны права администратора)"
+                "disable8dot3", 0, "Короткие имена включены", "Не удалось изменить"
             ),
             is_applied_fn=lambda _m: _fsutil_is("disable8dot3"),
         ),

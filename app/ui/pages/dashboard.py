@@ -15,7 +15,6 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
-from ...admin import is_admin, relaunch_as_admin
 from ...core.hardware import SystemInfo, collect_system_info, live_stats
 from ...core.sensors import (
     LHM_DOWNLOAD_URL,
@@ -121,15 +120,6 @@ class DashboardPage(QWidget):
         grid.addWidget(self.board_card, 2, 1)
         self.sensors_card = Card("Датчики и температура")
         self.sensors_card.add_row("Статус", "Чтение датчиков…")
-
-        self.admin_btn = QPushButton("Права администратора")
-        self.admin_btn.setToolTip(
-            "Часть датчиков (накопители, SMART) доступна только с правами администратора"
-        )
-        self.admin_btn.clicked.connect(relaunch_as_admin)
-        if is_admin():
-            self.admin_btn.hide()
-        self.sensors_card.add_header_widget(self.admin_btn)
 
         self._lhm_mode = "download"
         self.lhm_btn = QPushButton("LibreHardwareMonitor")
@@ -309,8 +299,7 @@ class DashboardPage(QWidget):
         if not readings:
             card.add_row(
                 "Статус",
-                "Датчики не найдены. Запустите LibreHardwareMonitor (кнопка справа) "
-                "или приложение от имени администратора.",
+                "Датчики не найдены. Запустите LibreHardwareMonitor (кнопка справа).",
             )
             return
         palette = theme.palette()

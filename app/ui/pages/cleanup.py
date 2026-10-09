@@ -15,7 +15,6 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
-from ...admin import relaunch_as_admin
 from ...core.cleanup import (
     CleanResult,
     ScanResult,
@@ -25,7 +24,7 @@ from ...core.cleanup import (
 )
 from ...core.workers import Worker, start_worker
 from ...utils import format_bytes, format_count
-from ..widgets import AdminBanner, LogView, make_header
+from ..widgets import LogView, make_header
 
 
 class CleanupPage(QWidget):
@@ -43,10 +42,6 @@ class CleanupPage(QWidget):
                     "затем «Очистить выбранное». Занятые файлы будут пропущены.",
                 )
             )
-
-        self.banner = AdminBanner()
-        self.banner.elevate_requested.connect(relaunch_as_admin)
-        root.addWidget(self.banner)
 
         self.targets = default_targets()
 
@@ -106,10 +101,7 @@ class CleanupPage(QWidget):
             check.setCheckState(Qt.Checked)
             self.table.setItem(row, 0, check)
             self.table.setItem(row, 1, QTableWidgetItem(target.name))
-            description = target.description
-            if target.requires_admin:
-                description += " [нужны права администратора]"
-            self.table.setItem(row, 2, QTableWidgetItem(description))
+            self.table.setItem(row, 2, QTableWidgetItem(target.description))
             size_text = files_text = "—"
             if results and target.key in results:
                 result = results[target.key]

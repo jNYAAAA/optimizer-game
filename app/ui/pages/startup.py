@@ -15,10 +15,9 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
-from ...admin import relaunch_as_admin
 from ...core.startup import StartupItem, list_startup_items, restore_all, set_enabled
 from ...core.workers import Worker, start_worker
-from ..widgets import AdminBanner, LogView, make_header
+from ..widgets import LogView, make_header
 
 
 class StartupPage(QWidget):
@@ -33,13 +32,9 @@ class StartupPage(QWidget):
                 make_header(
                     "Автозагрузка",
                     "Отключённые записи сохраняются в папке данных приложения и могут "
-                    "быть включены обратно. Записи системы (HKLM) требуют прав администратора.",
+                    "быть включены обратно.",
                 )
             )
-
-        self.banner = AdminBanner()
-        self.banner.elevate_requested.connect(relaunch_as_admin)
-        root.addWidget(self.banner)
 
         self.table = QTableWidget(0, 5)
         self.table.setHorizontalHeaderLabels(["Вкл.", "Название", "Команда", "Источник", "Область"])

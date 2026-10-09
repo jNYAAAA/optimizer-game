@@ -3,7 +3,7 @@ from __future__ import annotations
 
 from datetime import datetime
 
-from PySide6.QtCore import QRectF, Qt, Signal
+from PySide6.QtCore import QRectF, Qt
 from PySide6.QtGui import QColor, QPainter, QPainterPath, QPen
 from PySide6.QtWidgets import (
     QAbstractButton,
@@ -12,12 +12,11 @@ from PySide6.QtWidgets import (
     QHBoxLayout,
     QLabel,
     QPlainTextEdit,
-    QPushButton,
+    QScrollArea,
     QVBoxLayout,
     QWidget,
 )
 
-from ..admin import is_admin
 from . import theme
 
 
@@ -168,30 +167,13 @@ class ThemeToggleButton(QAbstractButton):
         painter.end()
 
 
-class AdminBanner(QFrame):
-    """Полоса-предупреждение о недостатке прав администратора."""
-
-    elevate_requested = Signal()
-
-    def __init__(self, parent: QWidget | None = None) -> None:
-        super().__init__(parent)
-        self.setObjectName("Card")
-        layout = QHBoxLayout(self)
-        layout.setContentsMargins(12, 8, 12, 8)
-        self.label = QLabel()
-        self.label.setWordWrap(True)
-        layout.addWidget(self.label, 1)
-        self.button = QPushButton("Запустить от имени администратора")
-        self.button.clicked.connect(self.elevate_requested.emit)
-        layout.addWidget(self.button)
-        self.refresh()
-
-    def refresh(self) -> None:
-        if is_admin():
-            self.label.setText("Приложение запущено с правами администратора.")
-            self.button.setEnabled(False)
-        else:
-            self.label.setText(
-                "Некоторые действия требуют прав администратора и будут отмечены ошибкой."
-            )
-            self.button.setEnabled(True)
+def scrollable(widget: QWidget) -> QScrollArea:
+    """Оборачивает страницу в вертикальную прокрутку."""
+    area = QScrollArea()
+    area.setWidgetResizable(True)
+    area.setFrameShape(QFrame.NoFrame)
+    area.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
+    area.setWidget(widget)
+    area.setStyleSheet("QScrollArea { background: transparent; border: none; }")
+    area.viewport().setAutoFillBackground(False)
+    return area

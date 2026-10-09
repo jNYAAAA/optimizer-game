@@ -18,7 +18,6 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
-from ...admin import is_admin, relaunch_as_admin
 from ...core import services
 from ...core.services import (
     START_MODE_LABELS,
@@ -27,7 +26,7 @@ from ...core.services import (
     list_services,
 )
 from ...core.workers import Worker, start_worker
-from ..widgets import AdminBanner, Card, LogView, make_header
+from ..widgets import Card, LogView, make_header
 
 _MODE_CHOICES = [("Automatic", "Автоматически"), ("Manual", "Вручную"), ("Disabled", "Отключена")]
 _CIM_TO_MODE = {"Auto": "Automatic", "Manual": "Manual", "Disabled": "Disabled"}
@@ -44,14 +43,9 @@ class ServicesPage(QWidget):
             root.addWidget(
                 make_header(
                     "Службы Windows",
-                    "Изменение типа запуска и остановка служб обычно требуют прав "
-                    "администратора. Отключайте только те службы, в назначении которых уверены.",
+                    "Отключайте только те службы, в назначении которых уверены.",
                 )
             )
-
-        self.banner = AdminBanner()
-        self.banner.elevate_requested.connect(relaunch_as_admin)
-        root.addWidget(self.banner)
 
         filters = QHBoxLayout()
         self.search = QLineEdit()
@@ -223,8 +217,6 @@ class ServicesPage(QWidget):
         elif action == "stop":
             self._run_action(f"{service.name}: остановка", services.stop_service, service.name)
         else:
-            if not is_admin():
-                self.log.log("Для отключения службы нужны права администратора.")
             self._run_action(f"{service.name}: отключение", services.disable_service, service.name)
 
     def _on_action(self, label: str, result: tuple[bool, str]) -> None:

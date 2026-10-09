@@ -15,12 +15,10 @@ from PySide6.QtWidgets import (
     QListWidgetItem,
     QMainWindow,
     QStackedWidget,
-    QStatusBar,
     QVBoxLayout,
     QWidget,
 )
 
-from ..admin import admin_status_text
 from ..config import (
     APP_DISPLAY_NAME,
     APP_NAME,
@@ -35,7 +33,7 @@ from .pages.optimize import OptimizePage
 from .pages.settings import SettingsPage
 from .pages.tweaks import TweaksPage
 from .splash import SplashScreen
-from .widgets import ThemeToggleButton
+from .widgets import ThemeToggleButton, scrollable
 
 
 class MainWindow(QMainWindow):
@@ -89,22 +87,21 @@ class MainWindow(QMainWindow):
         content_layout.addWidget(self.stack, 1)
         layout.addWidget(content, 1)
 
-        self.pages: list[tuple[str, QWidget]] = [
-            ("Характеристики", DashboardPage()),
-            ("Оптимизация", OptimizePage()),
-            ("Твики", TweaksPage()),
-            ("Настройки", SettingsPage()),
+        definitions: list[tuple[str, QWidget, bool]] = [
+            ("Характеристики", DashboardPage(), True),
+            ("Оптимизация", OptimizePage(), False),
+            ("Твики", TweaksPage(), False),
+            ("Настройки", SettingsPage(), True),
         ]
-        for name, page in self.pages:
+        self.pages: list[tuple[str, QWidget]] = []
+        for name, page, use_scroll in definitions:
+            container = scrollable(page) if use_scroll else page
             self.nav.addItem(QListWidgetItem(name))
-            self.stack.addWidget(page)
+            self.stack.addWidget(container)
+            self.pages.append((name, page))
 
         self.nav.currentRowChanged.connect(self.stack.setCurrentIndex)
         self.nav.setCurrentRow(0)
-
-        status = QStatusBar()
-        status.showMessage(admin_status_text())
-        self.setStatusBar(status)
 
         self._update_theme_button()
 

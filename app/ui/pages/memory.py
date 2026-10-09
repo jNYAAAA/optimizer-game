@@ -12,11 +12,10 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
-from ...admin import relaunch_as_admin
 from ...core import memory
 from ...core.workers import Worker, start_worker
 from ...utils import format_bytes
-from ..widgets import AdminBanner, Card, LogView, make_header
+from ..widgets import Card, LogView, make_header
 
 
 class MemoryPage(QWidget):
@@ -30,14 +29,10 @@ class MemoryPage(QWidget):
             root.addWidget(
                 make_header(
                     "Оптимизация памяти",
-                    "Освобождает рабочие наборы процессов и (при наличии прав) список "
-                    "ожидания. Это временная мера: память быстро заполняется снова.",
+                    "Освобождает рабочие наборы процессов и список ожидания. "
+                    "Это временная мера: память быстро заполняется снова.",
                 )
             )
-
-        self.banner = AdminBanner()
-        self.banner.elevate_requested.connect(relaunch_as_admin)
-        root.addWidget(self.banner)
 
         self.stats_card = Card("Текущее состояние памяти")
         self._rows = {
