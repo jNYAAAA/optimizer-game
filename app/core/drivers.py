@@ -1,19 +1,20 @@
-"""Информация о драйверах и проверка обновлений через Windows Update.
+"""Информация о драйверах, проверка обновлений Windows Update и сайтов производителей.
 
-* ``Get-CimInstance Win32_PnPSignedDriver`` — установленные драйверы и их версии;
-* ``Microsoft.Update.Session`` — поиск доступных обновлений драйверов.
-
-Проверка обновлений охватывает только то, что публикует Microsoft (Windows
-Update). Собственные утилиты NVIDIA/AMD/Intel могут предлагать более свежие
-версии — это указано в интерфейсе.
+* ``Get-CimInstance Win32_PnPSignedDriver`` — установленные драйверы и версии;
+* ``Microsoft.Update.Session`` — доступные обновления драйверов через Windows Update;
+* NVIDIA AjaxDriverService — последняя версия драйвера с официального сайта
+  (для AMD/Intel автоматическая проверка недоступна, даётся ссылка на сайт).
 """
 from __future__ import annotations
 
+import json
+import urllib.request
+import xml.etree.ElementTree as ET
 from dataclasses import dataclass, field
+from datetime import datetime
 
 from ..utils import as_list, powershell_json
 
-# Порядок отображения важных классов устройств.
 CLASS_ORDER = [
     "DISPLAY",
     "NET",
@@ -51,6 +52,18 @@ CLASS_LABELS = {
     "MOUSE": "Мышь",
 }
 
+_VENDOR_SITES = {
+    "AMD": "https://www.amd.com/en/support/download/drivers.html",
+    "Intel": "https://www.intel.com/content/www/us/en/download/785597/intel-arc-iris-xe-graphics-windows.html",
+}
+_NVIDIA_LOOKUP = "https://www.nvidia.com/Download/API/lookupValueSearch.aspx?TypeID=3"
+_NVIDIA_DRIVER = (
+    "https://gfwsl.geforce.com/services_toolkit/services/com/nvidia/services/"
+    "AjaxDriverService.php?func=DriverManualLookup&psid={psid}&pfid={pfid}"
+    "&osID=57&languageCode=1033&beta=0&isWHQL=1&dltype=-1&dch=1&upCRD=0&qnf=0"
+    "&sort1=0&numberOfResults=1"
+)
+
 
 @dataclass
 class DriverInfo:
@@ -77,6 +90,18 @@ class DriverUpdateResult:
     ok: bool
     updates: list[DriverUpdate] = field(default_factory=list)
     message: str = ""
+
+
+@dataclass
+class VendorDriverInfo:
+    vendor: str
+    device: str
+    installed: str
+    latest: str
+    release_date: str
+    url: str
+    update_available: bool
+    note: str = ""
 
 
 _LIST_SCRIPT = r"""
@@ -111,8 +136,10 @@ $updates = foreach ($u in $result.Updates) {
 """
 
 
+# ---------------------------------------------------------------------------
+# Установленные драйверы
+# ---------------------------------------------------------------------------
 def list_drivers() -> list[DriverInfo]:
-    """Возвращает установленные драйверы ключевых классов устройств."""
     try:
         data = powershell_json(_LIST_SCRIPT, timeout=120)
     except Exception:  # noqa: BLE001
@@ -153,8 +180,15 @@ def list_drivers() -> list[DriverInfo]:
     return drivers
 
 
+def display_drivers(drivers: list[DriverInfo] | None = None) -> list[DriverInfo]:
+    drivers = drivers if drivers is not None else list_drivers()
+    return [d for d in drivers if d.device_class.upper() == "DISPLAY"]
+
+
+# ---------------------------------------------------------------------------
+# Windows Update
+# ---------------------------------------------------------------------------
 def check_driver_updates() -> DriverUpdateResult:
-    """Ищет доступные обновления драйверов через Windows Update."""
     try:
         data = powershell_json(_UPDATE_SCRIPT, timeout=300)
     except Exception as exc:  # noqa: BLE001
@@ -179,8 +213,153 @@ def check_driver_updates() -> DriverUpdateResult:
 
     if count == 0 and not updates:
         return DriverUpdateResult(
-            True, [], "Обновления драйверов не найдены — установленные версии актуальны."
+            True, [], "Windows Update: обновления драйверов не найдены."
         )
-    return DriverUpdateResult(
-        True, updates, f"Доступно обновлений драйверов: {count}"
+    return DriverUpdateResult(True, updates, f"Windows Update: доступно обновлений — {count}")
+
+
+# ---------------------------------------------------------------------------
+# Онлайн-проверка у производителя
+# ---------------------------------------------------------------------------
+def _http_get(url: str, timeout: int = 25) -> str:
+    request = urllib.request.Request(
+        url, headers={"User-Agent": "Mozilla/5.0 (OptimizerGame)"}
     )
+    with urllib.request.urlopen(request, timeout=timeout) as response:
+        return response.read().decode("utf-8", errors="replace")
+
+
+def _normalize(name: str) -> str:
+    text = name.lower()
+    for token in ("nvidia", "geforce", "(tm)", "®", "™", "(r)"):
+        text = text.replace(token, "")
+    return " ".join(text.split())
+
+
+def _nvidia_marketing_version(wddm: str) -> str | None:
+    """32.0.16.1692 -> 616.92 (маркетинговая версия NVIDIA)."""
+    parts = [p for p in wddm.split(".") if p.isdigit()]
+    if len(parts) < 4:
+        return None
+    digits = "".join(parts[-2:])
+    if len(digits) < 5:
+        return None
+    last5 = digits[-5:]
+    return f"{last5[:3]}.{last5[3:]}"
+
+
+def _version_tuple(version: str) -> tuple[int, ...]:
+    parts = []
+    for chunk in version.replace(",", ".").split("."):
+        chunk = "".join(ch for ch in chunk if ch.isdigit())
+        parts.append(int(chunk) if chunk else 0)
+    return tuple(parts)
+
+
+def _format_date(value: str) -> str:
+    text = (value or "").strip()
+    if not text:
+        return ""
+    for fmt in ("%a %b %d, %Y", "%Y-%m-%d"):
+        try:
+            return datetime.strptime(text, fmt).strftime("%d.%m.%Y")
+        except ValueError:
+            continue
+    return text
+
+
+def _nvidia_lookup(device_name: str) -> tuple[str, str] | None:
+    try:
+        root = ET.fromstring(_http_get(_NVIDIA_LOOKUP, timeout=25))
+    except Exception:  # noqa: BLE001
+        return None
+
+    target = _normalize(device_name)
+    fallback: tuple[str, str] | None = None
+    for node in root.iter("LookupValue"):
+        name = (node.findtext("Name") or "").strip()
+        value = (node.findtext("Value") or "").strip()
+        parent = node.get("ParentID") or ""
+        if not name or not value or not parent:
+            continue
+        normalized = _normalize(name)
+        if normalized == target:
+            return (parent, value)
+        if fallback is None and (target in normalized or normalized in target):
+            fallback = (parent, value)
+    return fallback
+
+
+def _nvidia_latest(psid: str, pfid: str) -> dict | None:
+    data = json.loads(_http_get(_NVIDIA_DRIVER.format(psid=psid, pfid=pfid), timeout=25))
+    items = data.get("IDS") or []
+    if not items:
+        return None
+    info = items[0].get("downloadInfo") or {}
+    if not info.get("Version"):
+        return None
+    return info
+
+
+def latest_nvidia_driver(device_name: str, installed_wddm: str) -> VendorDriverInfo:
+    installed = _nvidia_marketing_version(installed_wddm) or installed_wddm
+    lookup = _nvidia_lookup(device_name)
+    if not lookup:
+        return VendorDriverInfo(
+            "NVIDIA", device_name, installed, "—", "", "", False,
+            "не удалось сопоставить модель с сайтом NVIDIA",
+        )
+    psid, pfid = lookup
+    try:
+        info = _nvidia_latest(psid, pfid)
+    except Exception as exc:  # noqa: BLE001
+        return VendorDriverInfo(
+            "NVIDIA", device_name, installed, "—", "", "", False,
+            f"ошибка запроса к NVIDIA: {exc}",
+        )
+    if not info:
+        return VendorDriverInfo(
+            "NVIDIA", device_name, installed, "—", "", "", False,
+            "NVIDIA не вернула данные о драйвере",
+        )
+    latest = str(info.get("Version") or "")
+    update = _version_tuple(latest) > _version_tuple(installed)
+    return VendorDriverInfo(
+        vendor="NVIDIA",
+        device=device_name,
+        installed=installed,
+        latest=latest,
+        release_date=_format_date(str(info.get("ReleaseDateTime") or "")),
+        url=str(info.get("DetailsURL") or ""),
+        update_available=update,
+        note="" if update else "установлена последняя версия",
+    )
+
+
+def check_gpu_drivers(displays: list[DriverInfo]) -> list[VendorDriverInfo]:
+    """Проверяет видеодрайверы на сайтах производителей (где это возможно)."""
+    results: list[VendorDriverInfo] = []
+    for driver in displays:
+        name = driver.name
+        low = name.lower()
+        if "nvidia" in low:
+            results.append(latest_nvidia_driver(name, driver.version))
+        elif "amd" in low or "radeon" in low:
+            results.append(
+                VendorDriverInfo(
+                    "AMD", name, driver.version, "—", "", _VENDOR_SITES["AMD"], False,
+                    "автопроверка недоступна — откройте сайт AMD",
+                )
+            )
+        elif "intel" in low:
+            results.append(
+                VendorDriverInfo(
+                    "Intel", name, driver.version, "—", "", _VENDOR_SITES["Intel"], False,
+                    "автопроверка недоступна — откройте сайт Intel",
+                )
+            )
+        else:
+            results.append(
+                VendorDriverInfo("—", name, driver.version, "—", "", "", False, "")
+            )
+    return results

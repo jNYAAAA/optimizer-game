@@ -1,4 +1,4 @@
-"""Страница драйверов: текущие версии и проверка обновлений."""
+"""Страница драйверов: текущие версии, Windows Update и сайты производителей."""
 from __future__ import annotations
 
 from PySide6.QtCore import Qt, QThreadPool
@@ -15,7 +15,14 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
-from ...core.drivers import DriverInfo, DriverUpdateResult, check_driver_updates, list_drivers
+from ...core.drivers import (
+    DriverInfo,
+    DriverUpdateResult,
+    VendorDriverInfo,
+    check_driver_updates,
+    check_gpu_drivers,
+    list_drivers,
+)
 from ...core.workers import Worker, start_worker
 from .. import theme
 from ..widgets import Card, LogView, make_header
@@ -31,8 +38,8 @@ class DriversPage(QWidget):
         root.addWidget(
             make_header(
                 "Драйверы",
-                "Текущие версии драйверов устройств и проверка доступных обновлений "
-                "через Windows Update.",
+                "Текущие версии драйверов устройств, проверка Windows Update и "
+                "официальных сайтов производителей.",
             )
         )
 
@@ -40,12 +47,16 @@ class DriversPage(QWidget):
         self.gpu_card.add_row("Статус", "Чтение драйверов…")
         root.addWidget(self.gpu_card)
 
+        self.vendor_card = Card("Обновления с сайтов производителей")
+        self.vendor_card.add_row("Статус", "Нажмите «Проверить обновления».")
+        root.addWidget(self.vendor_card)
+
         controls = QHBoxLayout()
         self.check_btn = QPushButton("ПРОВЕРИТЬ ОБНОВЛЕНИЯ")
         self.check_btn.setObjectName("Primary")
         self.check_btn.clicked.connect(self._check)
         controls.addWidget(self.check_btn)
-        self.status = QLabel("Нажмите «Проверить обновления», чтобы запросить Windows Update.")
+        self.status = QLabel("Проверка ещё не выполнялась.")
         self.status.setObjectName("PageHint")
         self.status.setWordWrap(True)
         controls.addWidget(self.status, 1)
@@ -76,6 +87,7 @@ class DriversPage(QWidget):
         self.log.setMaximumHeight(120)
         root.addWidget(self.log)
 
+        self._displays: list[DriverInfo] = []
         self._loaded = False
 
     # ------------------------------------------------------------------
@@ -95,11 +107,11 @@ class DriversPage(QWidget):
     def _on_drivers(self, drivers: list[DriverInfo]) -> None:
         self.progress.setRange(0, 100)
         self.progress.setValue(100)
+        self._displays = [d for d in drivers if d.device_class.upper() == "DISPLAY"]
 
-        displays = [d for d in drivers if d.device_class.upper() == "DISPLAY"]
         self.gpu_card.clear()
-        if displays:
-            for driver in displays:
+        if self._displays:
+            for driver in self._displays:
                 self.gpu_card.add_row(driver.name, f"{driver.version} · {driver.date}")
         else:
             self.gpu_card.add_row("Видеодрайвер", "Не найден")
@@ -115,37 +127,83 @@ class DriversPage(QWidget):
             self.table.setItem(row, 4, QTableWidgetItem(driver.manufacturer))
         self.log.log(f"Найдено драйверов: {len(drivers)}")
 
+    # ------------------------------------------------------------------
     def _check(self) -> None:
         self.check_btn.setEnabled(False)
         self.progress.setRange(0, 0)
-        self.status.setText("Запрос к Windows Update… это может занять до минуты.")
-        worker = Worker(check_driver_updates)
-        worker.signals.finished.connect(self._on_updates)
+        self.status.setText("Проверка Windows Update и сайтов производителей…")
+        displays = self._displays
+
+        def task(progress):
+            progress(5, "Запрос к Windows Update…")
+            windows_update = check_driver_updates()
+            progress(55, "Проверка сайтов производителей…")
+            vendors = check_gpu_drivers(displays)
+            return windows_update, vendors
+
+        worker = Worker(task, pass_progress=True)
+        worker.signals.progress.connect(lambda _p, m: self.status.setText(m))
+        worker.signals.finished.connect(self._on_results)
         worker.signals.failed.connect(self._on_failed)
         start_worker(worker)
 
-    def _on_updates(self, result: DriverUpdateResult) -> None:
+    def _on_results(self, result) -> None:
+        windows_update, vendors = result
         self.check_btn.setEnabled(True)
         self.progress.setRange(0, 100)
         self.progress.setValue(100)
         palette = theme.palette()
 
-        if not result.ok:
-            self.status.setText(result.message)
-            self.status.setStyleSheet(f"color: {palette['DANGER']};")
-            self.log.log(result.message)
-            return
+        any_update = False
+        self.vendor_card.clear()
+        if not vendors:
+            self.vendor_card.add_row("Видеодрайверы", "Не найдены")
+        for info in vendors:
+            any_update = self._add_vendor_row(info, palette) or any_update
 
-        if result.updates:
-            self.status.setText(f"{result.message}. Список — в журнале ниже.")
+        if windows_update.updates:
+            any_update = True
+            for update in windows_update.updates:
+                self.log.log(f"Windows Update: {update.title} ({update.provider})".strip())
+        self.log.log(windows_update.message)
+
+        if any_update:
+            self.status.setText("Есть доступные обновления драйверов — см. карточки выше.")
             self.status.setStyleSheet(f"color: {palette['WARN']};")
-            for update in result.updates:
-                self.log.log(f"Обновление: {update.title} ({update.provider}) {update.date}".strip())
         else:
-            self.status.setText(result.message)
+            self.status.setText("Доступных обновлений не найдено — версии актуальны.")
             self.status.setStyleSheet(f"color: {palette['OK']};")
-            self.log.log(result.message)
-        self.log.log("Совет: NVIDIA/AMD/Intel могут предлагать более свежие драйверы, чем Windows Update.")
+
+    def _add_vendor_row(self, info: VendorDriverInfo, palette: dict) -> bool:
+        caption = info.device
+        if info.latest and info.latest != "—":
+            text = f"{info.installed} → {info.latest}"
+            if info.release_date:
+                text += f" · {info.release_date}"
+            if info.update_available:
+                text += " · ДОСТУПНО ОБНОВЛЕНИЕ"
+            elif info.note:
+                text += f" · {info.note}"
+        else:
+            text = info.installed
+            if info.note:
+                text += f" · {info.note}"
+
+        label = self.vendor_card.add_row(caption, text)
+        if info.url:
+            label.setText(f"{text} · <a href=\"{info.url}\">сайт</a>")
+            label.setOpenExternalLinks(True)
+            label.setTextInteractionFlags(Qt.TextBrowserInteraction)
+
+        if info.update_available:
+            label.setStyleSheet(f"color: {palette['WARN']};")
+            self.log.log(f"{info.device}: доступна версия {info.latest} (установлена {info.installed})")
+        elif info.latest and info.latest != "—":
+            label.setStyleSheet(f"color: {palette['OK']};")
+            self.log.log(f"{info.device}: установлена последняя версия {info.installed}")
+        else:
+            self.log.log(f"{info.device}: {info.note or 'нет данных об обновлениях'}")
+        return info.update_available
 
     def _on_failed(self, message: str) -> None:
         self.check_btn.setEnabled(True)
