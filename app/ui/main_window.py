@@ -29,6 +29,7 @@ from ..config import (
 from ..utils import resource_path
 from . import theme
 from .pages.dashboard import DashboardPage
+from .pages.drivers import DriversPage
 from .pages.optimize import OptimizePage
 from .pages.settings import SettingsPage
 from .pages.tweaks import TweaksPage
@@ -89,6 +90,7 @@ class MainWindow(QMainWindow):
 
         definitions: list[tuple[str, QWidget, bool]] = [
             ("Характеристики", DashboardPage(), True),
+            ("Драйверы", DriversPage(), False),
             ("Оптимизация", OptimizePage(), False),
             ("Твики", TweaksPage(), False),
             ("Настройки", SettingsPage(), True),
