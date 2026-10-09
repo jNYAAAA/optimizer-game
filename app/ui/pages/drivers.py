@@ -7,6 +7,7 @@ from PySide6.QtWidgets import (
     QHBoxLayout,
     QHeaderView,
     QLabel,
+    QMessageBox,
     QProgressBar,
     QPushButton,
     QTableWidget,
@@ -21,6 +22,8 @@ from ...core.drivers import (
     VendorDriverInfo,
     check_driver_updates,
     check_gpu_drivers,
+    install_nvidia_driver,
+    install_windows_driver_updates,
     list_drivers,
 )
 from ...core.workers import Worker, start_worker
@@ -50,6 +53,20 @@ class DriversPage(QWidget):
         self.vendor_card = Card("Обновления с сайтов производителей")
         self.vendor_card.add_row("Статус", "Нажмите «Проверить обновления».")
         root.addWidget(self.vendor_card)
+
+        install_row = QHBoxLayout()
+        self.install_btn = QPushButton("СКАЧАТЬ И УСТАНОВИТЬ (NVIDIA)")
+        self.install_btn.setObjectName("Primary")
+        self.install_btn.clicked.connect(self._install_nvidia)
+        self.install_btn.hide()
+        install_row.addWidget(self.install_btn)
+        self.wu_install_btn = QPushButton("УСТАНОВИТЬ ОБНОВЛЕНИЯ WINDOWS")
+        self.wu_install_btn.setObjectName("Primary")
+        self.wu_install_btn.clicked.connect(self._install_windows)
+        self.wu_install_btn.hide()
+        install_row.addWidget(self.wu_install_btn)
+        install_row.addStretch(1)
+        root.addLayout(install_row)
 
         controls = QHBoxLayout()
         self.check_btn = QPushButton("ПРОВЕРИТЬ ОБНОВЛЕНИЯ")
@@ -88,6 +105,8 @@ class DriversPage(QWidget):
         root.addWidget(self.log)
 
         self._displays: list[DriverInfo] = []
+        self._nvidia_info: VendorDriverInfo | None = None
+        self._wu_available = False
         self._loaded = False
 
     # ------------------------------------------------------------------
@@ -167,8 +186,17 @@ class DriversPage(QWidget):
                 self.log.log(f"Windows Update: {update.title} ({update.provider})".strip())
         self.log.log(windows_update.message)
 
+        self._nvidia_info = next(
+            (i for i in vendors if i.update_available and i.download_url), None
+        )
+        self.install_btn.setVisible(self._nvidia_info is not None)
+        self._wu_available = bool(windows_update.updates)
+        self.wu_install_btn.setVisible(self._wu_available)
+
         if any_update:
-            self.status.setText("Есть доступные обновления драйверов — см. карточки выше.")
+            self.status.setText(
+                "Есть доступные обновления — нажмите «Скачать и установить»."
+            )
             self.status.setStyleSheet(f"color: {palette['WARN']};")
         else:
             self.status.setText("Доступных обновлений не найдено — версии актуальны.")
@@ -205,8 +233,76 @@ class DriversPage(QWidget):
             self.log.log(f"{info.device}: {info.note or 'нет данных об обновлениях'}")
         return info.update_available
 
+    # ------------------------------------------------------------------
+    def _install_nvidia(self) -> None:
+        info = self._nvidia_info
+        if info is None:
+            return
+        answer = QMessageBox.question(
+            self,
+            "Установка драйвера NVIDIA",
+            f"Скачать и установить драйвер {info.latest} для {info.device}?\n\n"
+            "Файл около 1 ГБ; установка может занять несколько минут и потребовать "
+            "перезагрузку.",
+            QMessageBox.Yes | QMessageBox.No,
+            QMessageBox.No,
+        )
+        if answer != QMessageBox.Yes:
+            return
+        self._run_install(
+            "Загрузка драйвера NVIDIA…", install_nvidia_driver, info.download_url
+        )
+
+    def _install_windows(self) -> None:
+        if not self._wu_available:
+            return
+        answer = QMessageBox.question(
+            self,
+            "Установка обновлений Windows",
+            "Скачать и установить доступные обновления драйверов через Windows Update?",
+            QMessageBox.Yes | QMessageBox.No,
+            QMessageBox.No,
+        )
+        if answer != QMessageBox.Yes:
+            return
+        self._run_install("Установка обновлений Windows…", install_windows_driver_updates)
+
+    def _run_install(self, label: str, fn, *args) -> None:
+        self.check_btn.setEnabled(False)
+        self.install_btn.setEnabled(False)
+        self.wu_install_btn.setEnabled(False)
+        self.progress.setRange(0, 100)
+        self.progress.setValue(0)
+        self.status.setText(label)
+        self.status.setStyleSheet("")
+        worker = Worker(fn, *args, pass_progress=True)
+        worker.signals.progress.connect(self._on_install_progress)
+        worker.signals.finished.connect(self._on_install_done)
+        worker.signals.failed.connect(self._on_failed)
+        start_worker(worker)
+
+    def _on_install_progress(self, percent: int, message: str) -> None:
+        self.progress.setValue(percent)
+        if message:
+            self.status.setText(message)
+
+    def _on_install_done(self, result) -> None:
+        ok, message = result if isinstance(result, tuple) else (bool(result), "")
+        self.check_btn.setEnabled(True)
+        self.install_btn.setEnabled(True)
+        self.wu_install_btn.setEnabled(True)
+        self.progress.setRange(0, 100)
+        self.progress.setValue(100)
+        palette = theme.palette()
+        self.status.setText(message)
+        self.status.setStyleSheet(f"color: {palette['OK'] if ok else palette['DANGER']};")
+        self.log.log(message)
+        self.load()
+
     def _on_failed(self, message: str) -> None:
         self.check_btn.setEnabled(True)
+        self.install_btn.setEnabled(True)
+        self.wu_install_btn.setEnabled(True)
         self.progress.setRange(0, 100)
         self.progress.setValue(0)
         self.status.setText(f"Ошибка: {message}")

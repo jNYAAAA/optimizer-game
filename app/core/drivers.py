@@ -8,12 +8,15 @@
 from __future__ import annotations
 
 import json
+import os
+import subprocess
+import tempfile
 import urllib.request
 import xml.etree.ElementTree as ET
 from dataclasses import dataclass, field
 from datetime import datetime
 
-from ..utils import as_list, powershell_json
+from ..utils import CREATE_NO_WINDOW, as_list, powershell_json, run_powershell
 
 CLASS_ORDER = [
     "DISPLAY",
@@ -102,6 +105,7 @@ class VendorDriverInfo:
     url: str
     update_available: bool
     note: str = ""
+    download_url: str = ""
 
 
 _LIST_SCRIPT = r"""
@@ -333,6 +337,7 @@ def latest_nvidia_driver(device_name: str, installed_wddm: str) -> VendorDriverI
         url=str(info.get("DetailsURL") or ""),
         update_available=update,
         note="" if update else "установлена последняя версия",
+        download_url=str(info.get("DownloadURL") or ""),
     )
 
 
@@ -363,3 +368,115 @@ def check_gpu_drivers(displays: list[DriverInfo]) -> list[VendorDriverInfo]:
                 VendorDriverInfo("—", name, driver.version, "—", "", "", False, "")
             )
     return results
+
+
+# ---------------------------------------------------------------------------
+# Установка обновлений
+# ---------------------------------------------------------------------------
+_INSTALL_WU_SCRIPT = r"""
+$ErrorActionPreference = 'Stop'
+$session = New-Object -ComObject Microsoft.Update.Session
+$searcher = $session.CreateUpdateSearcher()
+$result = $searcher.Search("IsInstalled=0 and Type='Driver'")
+if ($result.Updates.Count -eq 0) { 'NONE'; exit 0 }
+$coll = New-Object -ComObject Microsoft.Update.UpdateColl
+foreach ($u in $result.Updates) { [void]$coll.Add($u) }
+$downloader = $session.CreateUpdateDownloader()
+$downloader.Updates = $coll
+[void]$downloader.Download()
+$installer = $session.CreateUpdateInstaller()
+$installer.Updates = $coll
+$r = $installer.Install()
+[ordered]@{
+    resultCode     = [int]$r.ResultCode
+    rebootRequired = [bool]$r.RebootRequired
+    count          = [int]$coll.Count
+} | ConvertTo-Json -Compress
+"""
+
+
+def install_windows_driver_updates(progress=None) -> tuple[bool, str]:
+    """Скачивает и устанавливает доступные драйверы через Windows Update."""
+    if progress:
+        progress(5, "Поиск и загрузка обновлений Windows…")
+    proc = run_powershell(_INSTALL_WU_SCRIPT, timeout=2400)
+    text = (proc.stdout or "").strip().lstrip("\ufeff")
+
+    if text.startswith("NONE") or (not text and proc.returncode == 0):
+        return False, "Обновления драйверов Windows Update не найдены."
+
+    try:
+        data = json.loads(text)
+    except ValueError:
+        message = (proc.stderr or text or "Не удалось установить обновления.").strip()
+        return False, message
+
+    try:
+        code = int(data.get("resultCode", -1))
+    except (TypeError, ValueError):
+        code = -1
+    reboot = bool(data.get("rebootRequired"))
+
+    if code in (2, 3):
+        message = "Обновления драйверов установлены."
+        if code == 3:
+            message += " Часть — с ошибками."
+        if reboot:
+            message += " Требуется перезагрузка."
+        return True, message
+    return False, f"Установка не удалась (код {code})."
+
+
+def _download_file(url: str, dest: str, progress=None) -> None:
+    request = urllib.request.Request(
+        url, headers={"User-Agent": "Mozilla/5.0 (OptimizerGame)"}
+    )
+    with urllib.request.urlopen(request, timeout=60) as response:
+        total = int(response.headers.get("Content-Length") or 0)
+        downloaded = 0
+        with open(dest, "wb") as handle:
+            while True:
+                chunk = response.read(1024 * 512)
+                if not chunk:
+                    break
+                handle.write(chunk)
+                downloaded += len(chunk)
+                if progress and total:
+                    percent = min(int(downloaded / total * 90), 90)
+                    progress(percent, f"Загрузка драйвера… {downloaded * 100 // total}%")
+
+
+def install_nvidia_driver(download_url: str, progress=None) -> tuple[bool, str]:
+    """Скачивает установщик NVIDIA и запускает тихую установку."""
+    if not download_url:
+        return False, "Не удалось получить ссылку на драйвер NVIDIA."
+
+    dest = os.path.join(tempfile.gettempdir(), "optimizer_nvidia_driver.exe")
+    if progress:
+        progress(1, "Загрузка драйвера NVIDIA…")
+    try:
+        _download_file(download_url, dest, progress)
+    except Exception as exc:  # noqa: BLE001
+        return False, f"Ошибка загрузки драйвера: {exc}"
+
+    if progress:
+        progress(92, "Установка драйвера NVIDIA (может занять несколько минут)…")
+    try:
+        proc = subprocess.run(
+            [dest, "-s", "-noreboot"],
+            timeout=2400,
+            creationflags=CREATE_NO_WINDOW,
+        )
+    except subprocess.TimeoutExpired:
+        return False, "Установка драйвера заняла слишком много времени."
+    except Exception as exc:  # noqa: BLE001
+        return False, f"Не удалось запустить установщик: {exc}"
+    finally:
+        try:
+            os.remove(dest)
+        except OSError:
+            pass
+
+    if proc.returncode == 0:
+        return True, "Драйвер NVIDIA установлен. Может потребоваться перезагрузка."
+    return False, f"Установщик NVIDIA завершился с кодом {proc.returncode}."
