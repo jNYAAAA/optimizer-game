@@ -1,13 +1,14 @@
-"""Настройки NVIDIA: список рекомендованных параметров и быстрый переход.
+"""Настройки NVIDIA для игры: выбор значений NVIDIA и быстрый переход.
 
-Параметры драйвера NVIDIA хранятся в его профиле (NVAPI), а не в конфиге игры.
-Приложение показывает рекомендованные значения и открывает нужные утилиты.
+Параметры драйвера хранятся в профиле NVAPI, поэтому приложение показывает
+рекомендованные значения с выбором вариантов и копирует готовый список для
+быстрой настройки в NVIDIA App.
 """
 from __future__ import annotations
 
 import os
 
-from PySide6.QtCore import Qt
+from PySide6.QtGui import QGuiApplication
 from PySide6.QtWidgets import (
     QHBoxLayout,
     QLabel,
@@ -16,28 +17,10 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
+from ...core.nvidia import format_profile, profile_for
 from ...core.win_settings import cs2_exe_path
 from ...utils import open_path
-from ..widgets import Card, InfoIcon, LogView, make_header
-
-# (название, рекомендуемое значение, пояснение)
-NVIDIA_SETTINGS: list[tuple[str, str, str]] = [
-    ("Image Scaling", "Off", "Апскейл изображения на уровне драйвера. Лучше выключить и использовать FSR/DLSS в игре."),
-    ("Low Latency Mode", "Ultra", "Снижает задержку ввода. В игре NVIDIA Reflex приоритетнее."),
-    ("Power management mode", "Prefer maximum performance", "Не даёт GPU сбрасывать частоты в игре."),
-    ("Texture filtering — Quality", "High performance", "Чуть менее качественная фильтрация ради FPS."),
-    ("Texture filtering — Negative LOD bias", "Allow", "Разрешает отрицательный LOD bias (резкость текстур)."),
-    ("Texture filtering — Anisotropic sample optimization", "On", "Ускоряет анизотропную фильтрацию."),
-    ("Texture filtering — Trilinear optimization", "On", "Ускоряет трилинейную фильтрацию."),
-    ("Threaded optimization", "On", "Многопоточная обработка драйвера."),
-    ("Vertical sync", "Off", "VSync добавляет задержку; выключить."),
-    ("Preferred refresh rate", "Highest available", "Всегда берёт максимальную частоту монитора."),
-    ("Shader Cache Size", "10 GB (или Unlimited)", "Большой кэш шейдеров уменьшает подгрузки."),
-    ("Monitor Technology", "Fixed refresh (при G-Sync — G-Sync)", "Режим синхронизации монитора."),
-    ("Max Frame Rate", "Off (или ~237 для 240 Гц)", "Ограничение FPS; чуть ниже герцовки снижает задержку."),
-    ("Background Application Max Frame Rate", "Off", "Ограничение FPS фоновых приложений."),
-    ("Vulkan/OpenGL present method", "Prefer layered on DXGI Swapchain", "Метод вывода Vulkan/OpenGL."),
-]
+from ..widgets import Card, LogView, OptionRow, make_header
 
 _NVIDIA_APP_PATHS = [
     r"C:\Program Files\NVIDIA Corporation\NVIDIA App\NVIDIA App.exe",
@@ -61,8 +44,16 @@ def _open_first(paths: list[str]) -> bool:
 
 
 class NvidiaPage(QWidget):
-    def __init__(self, parent: QWidget | None = None, show_header: bool = True) -> None:
+    def __init__(
+        self,
+        game_key: str = "cs2",
+        parent: QWidget | None = None,
+        show_header: bool = True,
+    ) -> None:
         super().__init__(parent)
+        self.game_key = game_key
+        self.settings = profile_for(game_key)
+
         root = QVBoxLayout(self)
         root.setSpacing(14)
         if show_header:
@@ -70,52 +61,42 @@ class NvidiaPage(QWidget):
             root.addWidget(
                 make_header(
                     "Настройки NVIDIA",
-                    "Рекомендованные параметры для Counter-Strike 2. Задаются в NVIDIA App / "
-                    "панели управления NVIDIA для cs2.exe (программные настройки).",
+                    "Рекомендованные параметры драйвера для этой игры. Задаются в NVIDIA App / "
+                    "панели управления NVIDIA (программные настройки для .exe игры).",
                 )
             )
         else:
             root.setContentsMargins(0, 0, 0, 0)
 
-        self.help_label = QLabel(
-            "Наведите на значок (i), чтобы узнать, что делает параметр."
-        )
+        self.help_label = QLabel("Наведите на значок (i), чтобы узнать, что делает параметр.")
         self.help_label.setObjectName("PageHint")
         self.help_label.setWordWrap(True)
         root.addWidget(self.help_label)
 
-        card = Card("Параметры драйвера для cs2.exe")
-        for name, value, help_text in NVIDIA_SETTINGS:
-            row = QWidget()
-            layout = QHBoxLayout(row)
-            layout.setContentsMargins(0, 3, 0, 3)
-            layout.setSpacing(8)
-            info = InfoIcon(help_text)
-            info.hovered.connect(self._on_help)
-            layout.addWidget(info)
-            caption = QLabel(name)
-            caption.setObjectName("Caption")
-            caption.setWordWrap(True)
-            layout.addWidget(caption, 1)
-            value_label = QLabel(value)
-            value_label.setObjectName("Value")
-            value_label.setWordWrap(True)
-            value_label.setMinimumWidth(240)
-            layout.addWidget(value_label)
+        card = Card("Параметры драйвера NVIDIA")
+        self._rows: list[tuple[object, OptionRow]] = []
+        for setting in self.settings:
+            row = OptionRow(setting.name, setting.help, setting.options, setting.value, show_apply=False)
+            row.help_hovered.connect(self._on_help)
             card.body.addWidget(row, card.body.rowCount(), 0, 1, 2)
+            self._rows.append((setting, row))
         root.addWidget(card)
 
         controls = QHBoxLayout()
+        copy_btn = QPushButton("СКОПИРОВАТЬ СПИСОК")
+        copy_btn.setObjectName("Primary")
+        copy_btn.clicked.connect(self._copy)
+        controls.addWidget(copy_btn)
         app_btn = QPushButton("ОТКРЫТЬ NVIDIA APP")
-        app_btn.setObjectName("Primary")
         app_btn.clicked.connect(self._open_app)
         controls.addWidget(app_btn)
         cp_btn = QPushButton("ПАНЕЛЬ УПРАВЛЕНИЯ NVIDIA")
         cp_btn.clicked.connect(self._open_cp)
         controls.addWidget(cp_btn)
-        cs2_btn = QPushButton("ОТКРЫТЬ ПАПКУ CS2")
-        cs2_btn.clicked.connect(self._open_cs2)
-        controls.addWidget(cs2_btn)
+        if game_key == "cs2":
+            cs2_btn = QPushButton("ОТКРЫТЬ ПАПКУ CS2")
+            cs2_btn.clicked.connect(self._open_cs2)
+            controls.addWidget(cs2_btn)
         controls.addStretch(1)
         root.addLayout(controls)
 
@@ -124,10 +105,19 @@ class NvidiaPage(QWidget):
         root.addWidget(self.log)
         root.addStretch(1)
 
+    # ------------------------------------------------------------------
     def _on_help(self, text: str) -> None:
         self.help_label.setText(
             text or "Наведите на значок (i), чтобы узнать, что делает параметр."
         )
+
+    def _values(self) -> dict:
+        return {setting.key: row.value() for setting, row in self._rows}
+
+    def _copy(self) -> None:
+        text = format_profile(self.settings, self._values())
+        QGuiApplication.clipboard().setText(text)
+        self.log.log("Список значений скопирован в буфер обмена — вставьте в NVIDIA App.")
 
     def _open_app(self) -> None:
         if not _open_first(_NVIDIA_APP_PATHS):

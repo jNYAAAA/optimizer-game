@@ -38,8 +38,8 @@ from .win_settings import WinSettingsPage
 
 COVER_W, COVER_H = 155, 232
 
-# Игры, у которых кроме настроек есть под-разделы (NVIDIA / Windows).
-EXTRA_SECTIONS = {"cs2": ["ИГРА", "NVIDIA", "WINDOWS"]}
+# Под-разделы экрана игры.
+SECTIONS = ["ИГРА", "NVIDIA", "WINDOWS"]
 
 
 def _cover_pixmap(profile: GameProfile, width: int, height: int) -> QPixmap:
@@ -322,35 +322,31 @@ class _GamePanel(QWidget):
         root.addLayout(header)
 
         settings_section = _GameSettingsSection(profile)
-        section_names = EXTRA_SECTIONS.get(profile.key)
-        if section_names:
-            segment = QHBoxLayout()
-            segment.setSpacing(8)
-            stack = QStackedWidget()
-            buttons: list[QPushButton] = []
-            pages: list[QWidget] = [
-                settings_section,
-                NvidiaPage(show_header=False),
-                WinSettingsPage(show_header=False),
-            ]
-            for index, title in enumerate(section_names):
-                button = QPushButton(title)
-                button.setObjectName("Segment")
-                button.setCheckable(True)
-                button.setCursor(Qt.PointingHandCursor)
-                button.clicked.connect(
-                    lambda _checked=False, idx=index, b=buttons, st=stack: _select_section(b, st, idx)
-                )
-                segment.addWidget(button)
-                buttons.append(button)
-            segment.addStretch(1)
-            for page in pages:
-                stack.addWidget(page)
-            root.addLayout(segment)
-            root.addWidget(stack, 1)
-            _select_section(buttons, stack, 0)
-        else:
-            root.addWidget(settings_section, 1)
+        segment = QHBoxLayout()
+        segment.setSpacing(8)
+        stack = QStackedWidget()
+        buttons: list[QPushButton] = []
+        pages: list[QWidget] = [
+            settings_section,
+            NvidiaPage(profile.key, show_header=False),
+            WinSettingsPage(show_header=False),
+        ]
+        for index, title in enumerate(SECTIONS):
+            button = QPushButton(title)
+            button.setObjectName("Segment")
+            button.setCheckable(True)
+            button.setCursor(Qt.PointingHandCursor)
+            button.clicked.connect(
+                lambda _checked=False, idx=index, b=buttons, st=stack: _select_section(b, st, idx)
+            )
+            segment.addWidget(button)
+            buttons.append(button)
+        segment.addStretch(1)
+        for page in pages:
+            stack.addWidget(page)
+        root.addLayout(segment)
+        root.addWidget(stack, 1)
+        _select_section(buttons, stack, 0)
 
         root.addStretch(0)
 

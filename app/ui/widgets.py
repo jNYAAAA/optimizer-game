@@ -205,6 +205,7 @@ class OptionRow(QWidget):
         help_text: str,
         options: list[tuple[str, str]],
         current: str = "",
+        show_apply: bool = True,
         parent: QWidget | None = None,
     ) -> None:
         super().__init__(parent)
@@ -232,6 +233,8 @@ class OptionRow(QWidget):
         self.apply_btn.setObjectName("Segment")
         self.apply_btn.clicked.connect(lambda: self.apply_requested.emit(self.combo.currentData()))
         layout.addWidget(self.apply_btn)
+        if not show_apply:
+            self.apply_btn.hide()
 
     def value(self) -> str:
         return self.combo.currentData()
