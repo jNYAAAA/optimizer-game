@@ -31,11 +31,9 @@ from . import theme
 from .pages.dashboard import DashboardPage
 from .pages.drivers import DriversPage
 from .pages.games import GamesPage
-from .pages.nvidia import NvidiaPage
 from .pages.optimize import OptimizePage
 from .pages.settings import SettingsPage
 from .pages.tweaks import TweaksPage
-from .pages.win_settings import WinSettingsPage
 from .splash import SplashScreen
 from .widgets import ThemeToggleButton, nav_icon, scrollable
 
@@ -102,12 +100,10 @@ class MainWindow(QMainWindow):
             ("Драйверы", DriversPage(), True),
             ("Оптимизация", OptimizePage(), False),
             ("Игры", GamesPage(), True),
-            ("NVIDIA", NvidiaPage(), True),
-            ("Windows", WinSettingsPage(), True),
             ("Твики", TweaksPage(), False),
             ("Настройки", SettingsPage(), True),
         ]
-        self._nav_kinds = ["info", "driver", "speed", "games", "nvidia", "windows", "tweaks", "settings"]
+        self._nav_kinds = ["info", "driver", "speed", "games", "tweaks", "settings"]
         self.pages: list[tuple[str, QWidget]] = []
         for name, page, use_scroll in definitions:
             container = scrollable(page) if use_scroll else page

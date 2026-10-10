@@ -1,4 +1,4 @@
-"""Оптимизация игр: сетка игр и экран настроек с выбором значений и откатом."""
+"""Оптимизация игр: сетка игр и экран настроек с под-разделами."""
 from __future__ import annotations
 
 from pathlib import Path
@@ -32,9 +32,14 @@ from ...core.games import (
 from ...core.workers import Worker, start_worker
 from ...utils import resource_path
 from .. import theme
-from ..widgets import Card, LogView, make_header
+from ..widgets import Card, InfoIcon, LogView, make_header
+from .nvidia import NvidiaPage
+from .win_settings import WinSettingsPage
 
 COVER_W, COVER_H = 155, 232
+
+# Игры, у которых кроме настроек есть под-разделы (NVIDIA / Windows).
+EXTRA_SECTIONS = {"cs2": ["ИГРА", "NVIDIA", "WINDOWS"]}
 
 
 def _cover_pixmap(profile: GameProfile, width: int, height: int) -> QPixmap:
@@ -76,27 +81,6 @@ class _GameTile(QFrame):
         super().mousePressEvent(event)
 
 
-class _InfoIcon(QLabel):
-    hovered = Signal(str)
-
-    def __init__(self, text: str, parent: QWidget | None = None) -> None:
-        super().__init__(parent)
-        self._text = text
-        pixmap = QPixmap(resource_path("assets/info.png"))
-        if not pixmap.isNull():
-            self.setPixmap(pixmap)
-        self.setCursor(Qt.WhatsThisCursor)
-        self.setToolTip(text)
-
-    def enterEvent(self, event) -> None:  # noqa: N802 - Qt API
-        self.hovered.emit(self._text)
-        super().enterEvent(event)
-
-    def leaveEvent(self, event) -> None:  # noqa: N802 - Qt API
-        self.hovered.emit("")
-        super().leaveEvent(event)
-
-
 class _SettingRow(QWidget):
     apply_requested = Signal(object, str)
     help_hovered = Signal(str)
@@ -109,7 +93,7 @@ class _SettingRow(QWidget):
         layout.setContentsMargins(0, 3, 0, 3)
         layout.setSpacing(8)
 
-        self.info = _InfoIcon(setting.help or setting.label)
+        self.info = InfoIcon(setting.help or setting.label)
         self.info.hovered.connect(self.help_hovered.emit)
         layout.addWidget(self.info)
 
@@ -138,8 +122,8 @@ class _SettingRow(QWidget):
         return self.combo.currentData()
 
 
-class _GamePanel(QWidget):
-    back_requested = Signal()
+class _GameSettingsSection(QWidget):
+    """Настройки самой игры (файл конфигурации)."""
 
     def __init__(self, profile: GameProfile, parent: QWidget | None = None) -> None:
         super().__init__(parent)
@@ -149,37 +133,10 @@ class _GamePanel(QWidget):
         root.setContentsMargins(0, 0, 0, 0)
         root.setSpacing(12)
 
-        top = QHBoxLayout()
-        back = QPushButton("←  НАЗАД")
-        back.setObjectName("Back")
-        back.setCursor(Qt.PointingHandCursor)
-        back.clicked.connect(self.back_requested.emit)
-        top.addWidget(back)
-        top.addStretch(1)
-        root.addLayout(top)
-
-        header = QHBoxLayout()
-        header.setSpacing(18)
-        cover = QLabel()
-        cover.setPixmap(_cover_pixmap(profile, 170, 255))
-        header.addWidget(cover, 0, Qt.AlignTop)
-        info = QVBoxLayout()
-        info.setSpacing(6)
-        name = QLabel(profile.name)
-        name.setObjectName("PageTitle")
-        info.addWidget(name)
-        caption = QLabel(
-            f"{len(profile.settings)} настроек · профиль «максимум FPS без потери качества»"
-        )
-        caption.setObjectName("Caption")
-        info.addWidget(caption)
         self.help_label = QLabel("Наведите на значок (i), чтобы узнать, за что отвечает настройка.")
         self.help_label.setObjectName("PageHint")
         self.help_label.setWordWrap(True)
-        info.addWidget(self.help_label)
-        info.addStretch(1)
-        header.addLayout(info, 1)
-        root.addLayout(header)
+        root.addWidget(self.help_label)
 
         card = Card("Настройки")
         self._rows: list[_SettingRow] = []
@@ -325,6 +282,85 @@ class _GamePanel(QWidget):
         self.log.log(f"Ошибка: {message}")
 
 
+class _GamePanel(QWidget):
+    back_requested = Signal()
+
+    def __init__(self, profile: GameProfile, parent: QWidget | None = None) -> None:
+        super().__init__(parent)
+        self.profile = profile
+
+        root = QVBoxLayout(self)
+        root.setContentsMargins(0, 0, 0, 0)
+        root.setSpacing(12)
+
+        top = QHBoxLayout()
+        back = QPushButton("←  НАЗАД")
+        back.setObjectName("Back")
+        back.setCursor(Qt.PointingHandCursor)
+        back.clicked.connect(self.back_requested.emit)
+        top.addWidget(back)
+        top.addStretch(1)
+        root.addLayout(top)
+
+        header = QHBoxLayout()
+        header.setSpacing(18)
+        cover = QLabel()
+        cover.setPixmap(_cover_pixmap(profile, 170, 255))
+        header.addWidget(cover, 0, Qt.AlignTop)
+        info = QVBoxLayout()
+        info.setSpacing(6)
+        name = QLabel(profile.name)
+        name.setObjectName("PageTitle")
+        info.addWidget(name)
+        caption = QLabel(
+            f"{len(profile.settings)} настроек · профиль «максимум FPS без потери качества»"
+        )
+        caption.setObjectName("Caption")
+        info.addWidget(caption)
+        info.addStretch(1)
+        header.addLayout(info, 1)
+        root.addLayout(header)
+
+        settings_section = _GameSettingsSection(profile)
+        section_names = EXTRA_SECTIONS.get(profile.key)
+        if section_names:
+            segment = QHBoxLayout()
+            segment.setSpacing(8)
+            stack = QStackedWidget()
+            buttons: list[QPushButton] = []
+            pages: list[QWidget] = [
+                settings_section,
+                NvidiaPage(show_header=False),
+                WinSettingsPage(show_header=False),
+            ]
+            for index, title in enumerate(section_names):
+                button = QPushButton(title)
+                button.setObjectName("Segment")
+                button.setCheckable(True)
+                button.setCursor(Qt.PointingHandCursor)
+                button.clicked.connect(
+                    lambda _checked=False, idx=index, b=buttons, st=stack: _select_section(b, st, idx)
+                )
+                segment.addWidget(button)
+                buttons.append(button)
+            segment.addStretch(1)
+            for page in pages:
+                stack.addWidget(page)
+            root.addLayout(segment)
+            root.addWidget(stack, 1)
+            _select_section(buttons, stack, 0)
+        else:
+            root.addWidget(settings_section, 1)
+
+        root.addStretch(0)
+
+
+def _select_section(buttons: list[QPushButton], stack: QStackedWidget, index: int) -> None:
+    for i, button in enumerate(buttons):
+        button.setChecked(i == index)
+    stack.setCurrentIndex(index)
+
+
 class GamesPage(QWidget):
     def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__(parent)
@@ -336,8 +372,7 @@ class GamesPage(QWidget):
             make_header(
                 "Оптимизация игр",
                 "Выберите игру — приложение применит профиль настроек «максимум FPS без "
-                "потери качества». Каждую настройку можно менять и применять отдельно, "
-                "а также откатить изменения.",
+                "потери качества». Для CS2 также есть под-разделы NVIDIA и Windows.",
             )
         )
 

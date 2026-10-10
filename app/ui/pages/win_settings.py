@@ -18,19 +18,21 @@ from ..widgets import Card, LogView, OptionRow, make_header
 
 
 class WinSettingsPage(QWidget):
-    def __init__(self, parent: QWidget | None = None) -> None:
+    def __init__(self, parent: QWidget | None = None, show_header: bool = True) -> None:
         super().__init__(parent)
         root = QVBoxLayout(self)
-        root.setContentsMargins(24, 20, 24, 20)
         root.setSpacing(14)
-
-        root.addWidget(
-            make_header(
-                "Настройки Windows",
-                "Игровые настройки Windows: питание, HAGS, игровой режим и другое. "
-                "Часть параметров требует прав администратора и перезагрузки.",
+        if show_header:
+            root.setContentsMargins(24, 20, 24, 20)
+            root.addWidget(
+                make_header(
+                    "Настройки Windows",
+                    "Игровые настройки Windows: питание, HAGS, игровой режим и другое. "
+                    "Часть параметров требует прав администратора и перезагрузки.",
+                )
             )
-        )
+        else:
+            root.setContentsMargins(0, 0, 0, 0)
 
         self.help_label = QLabel("Наведите на значок (i), чтобы узнать, за что отвечает настройка.")
         self.help_label.setObjectName("PageHint")

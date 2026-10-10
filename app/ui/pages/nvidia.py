@@ -61,19 +61,28 @@ def _open_first(paths: list[str]) -> bool:
 
 
 class NvidiaPage(QWidget):
-    def __init__(self, parent: QWidget | None = None) -> None:
+    def __init__(self, parent: QWidget | None = None, show_header: bool = True) -> None:
         super().__init__(parent)
         root = QVBoxLayout(self)
-        root.setContentsMargins(24, 20, 24, 20)
         root.setSpacing(14)
-
-        root.addWidget(
-            make_header(
-                "Настройки NVIDIA",
-                "Рекомендованные параметры для Counter-Strike 2. Задаются в NVIDIA App / "
-                "панели управления NVIDIA для cs2.exe (программные настройки).",
+        if show_header:
+            root.setContentsMargins(24, 20, 24, 20)
+            root.addWidget(
+                make_header(
+                    "Настройки NVIDIA",
+                    "Рекомендованные параметры для Counter-Strike 2. Задаются в NVIDIA App / "
+                    "панели управления NVIDIA для cs2.exe (программные настройки).",
+                )
             )
+        else:
+            root.setContentsMargins(0, 0, 0, 0)
+
+        self.help_label = QLabel(
+            "Наведите на значок (i), чтобы узнать, что делает параметр."
         )
+        self.help_label.setObjectName("PageHint")
+        self.help_label.setWordWrap(True)
+        root.addWidget(self.help_label)
 
         card = Card("Параметры драйвера для cs2.exe")
         for name, value, help_text in NVIDIA_SETTINGS:
@@ -82,6 +91,7 @@ class NvidiaPage(QWidget):
             layout.setContentsMargins(0, 3, 0, 3)
             layout.setSpacing(8)
             info = InfoIcon(help_text)
+            info.hovered.connect(self._on_help)
             layout.addWidget(info)
             caption = QLabel(name)
             caption.setObjectName("Caption")
@@ -113,6 +123,11 @@ class NvidiaPage(QWidget):
         self.log.setMaximumHeight(90)
         root.addWidget(self.log)
         root.addStretch(1)
+
+    def _on_help(self, text: str) -> None:
+        self.help_label.setText(
+            text or "Наведите на значок (i), чтобы узнать, что делает параметр."
+        )
 
     def _open_app(self) -> None:
         if not _open_first(_NVIDIA_APP_PATHS):
