@@ -90,7 +90,7 @@ class MainWindow(QMainWindow):
 
         definitions: list[tuple[str, QWidget, bool]] = [
             ("Характеристики", DashboardPage(), True),
-            ("Драйверы", DriversPage(), False),
+            ("Драйверы", DriversPage(), True),
             ("Оптимизация", OptimizePage(), False),
             ("Твики", TweaksPage(), False),
             ("Настройки", SettingsPage(), True),

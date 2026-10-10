@@ -15,6 +15,7 @@ import urllib.request
 import xml.etree.ElementTree as ET
 from dataclasses import dataclass, field
 from datetime import datetime
+from urllib.parse import quote_plus
 
 from ..utils import CREATE_NO_WINDOW, as_list, powershell_json, run_powershell
 
@@ -106,6 +107,26 @@ class VendorDriverInfo:
     update_available: bool
     note: str = ""
     download_url: str = ""
+
+
+@dataclass
+class MotherboardDriverInfo:
+    manufacturer: str = "—"
+    product: str = "—"
+    url: str = ""
+
+
+@dataclass
+class ProblemDevice:
+    name: str = "—"
+    status: str = "—"
+    device_class: str = "—"
+    instance_id: str = "—"
+    hardware_id: str = ""
+
+    @property
+    def catalog_url(self) -> str:
+        return catalog_search_url(self.hardware_id)
 
 
 _LIST_SCRIPT = r"""
@@ -480,3 +501,90 @@ def install_nvidia_driver(download_url: str, progress=None) -> tuple[bool, str]:
     if proc.returncode == 0:
         return True, "Драйвер NVIDIA установлен. Может потребоваться перезагрузка."
     return False, f"Установщик NVIDIA завершился с кодом {proc.returncode}."
+
+
+# ---------------------------------------------------------------------------
+# Материнская плата и устройства без драйверов
+# ---------------------------------------------------------------------------
+_BASEBOARD_SCRIPT = r"""
+$ErrorActionPreference = 'SilentlyContinue'
+$b = Get-CimInstance Win32_BaseBoard | Select-Object -First 1
+[ordered]@{ manufacturer = "$($b.Manufacturer)"; product = "$($b.Product)" } | ConvertTo-Json -Compress
+"""
+
+_PROBLEM_SCRIPT = r"""
+$ErrorActionPreference = 'SilentlyContinue'
+$items = Get-PnpDevice | Where-Object { $_.Present -eq $true -and $_.Status -ne 'OK' } | ForEach-Object {
+    $hw = ''
+    if ($_.HardwareID) { $hw = "$($_.HardwareID[0])" }
+    [ordered]@{
+        name        = "$($_.FriendlyName)"
+        status      = "$($_.Status)"
+        deviceClass = "$($_.Class)"
+        instanceId  = "$($_.InstanceID)"
+        hardwareId  = $hw
+    }
+}
+$items | ConvertTo-Json -Depth 3 -Compress
+"""
+
+
+def catalog_search_url(hardware_id: str) -> str:
+    """Ссылка на поиск драйвера в каталоге обновлений Microsoft."""
+    query = (hardware_id or "").strip()
+    return "https://www.catalog.update.microsoft.com/Search.aspx?q=" + quote_plus(query)
+
+
+def _vendor_url(manufacturer: str, product: str) -> str:
+    m = (manufacturer or "").lower()
+    slug = (product or "").strip().replace(" ", "-")
+    if "gigabyte" in m:
+        return f"https://www.gigabyte.com/Motherboard/{slug}/support#support-dl-driver"
+    if "msi" in m or "micro-star" in m:
+        return f"https://www.msi.com/Motherboard/{slug}/support"
+    if "asrock" in m:
+        return f"https://www.asrock.com/mb/{slug}/index.asp#Download"
+    if "asus" in m:
+        return "https://www.asus.com/support/download-center/"
+    if "biostar" in m:
+        return "https://www.biostar.com.tw/app/en/mb/introduction.php?S_ID=" + quote_plus(product or "")
+    query = quote_plus(f"{manufacturer} {product} drivers download")
+    return f"https://www.google.com/search?q={query}"
+
+
+def motherboard_driver_info() -> MotherboardDriverInfo:
+    """Производитель/модель материнской платы и ссылка на её драйверы."""
+    try:
+        data = powershell_json(_BASEBOARD_SCRIPT, timeout=30) or {}
+    except Exception:  # noqa: BLE001
+        data = {}
+    if not isinstance(data, dict):
+        data = {}
+    manufacturer = str(data.get("manufacturer") or "—").strip() or "—"
+    product = str(data.get("product") or "—").strip() or "—"
+    return MotherboardDriverInfo(manufacturer, product, _vendor_url(manufacturer, product))
+
+
+def problem_devices() -> list[ProblemDevice]:
+    """Устройства, у которых нет драйвера (или он с ошибкой)."""
+    try:
+        data = powershell_json(_PROBLEM_SCRIPT, timeout=60)
+    except Exception:  # noqa: BLE001
+        return []
+    devices: list[ProblemDevice] = []
+    for entry in as_list(data):
+        if not isinstance(entry, dict):
+            continue
+        name = str(entry.get("name") or "").strip()
+        if not name:
+            continue
+        devices.append(
+            ProblemDevice(
+                name=name,
+                status=str(entry.get("status") or "—"),
+                device_class=str(entry.get("deviceClass") or "—"),
+                instance_id=str(entry.get("instanceId") or "—"),
+                hardware_id=str(entry.get("hardwareId") or ""),
+            )
+        )
+    return devices

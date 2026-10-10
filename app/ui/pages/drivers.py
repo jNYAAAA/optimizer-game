@@ -1,5 +1,7 @@
-"""Страница драйверов: текущие версии, Windows Update и сайты производителей."""
+"""Страница драйверов: версии, Windows Update, сайты производителей, плата."""
 from __future__ import annotations
+
+import webbrowser
 
 from PySide6.QtCore import Qt, QThreadPool
 from PySide6.QtWidgets import (
@@ -18,13 +20,16 @@ from PySide6.QtWidgets import (
 
 from ...core.drivers import (
     DriverInfo,
-    DriverUpdateResult,
+    MotherboardDriverInfo,
+    ProblemDevice,
     VendorDriverInfo,
     check_driver_updates,
     check_gpu_drivers,
     install_nvidia_driver,
     install_windows_driver_updates,
     list_drivers,
+    motherboard_driver_info,
+    problem_devices,
 )
 from ...core.workers import Worker, start_worker
 from .. import theme
@@ -41,10 +46,18 @@ class DriversPage(QWidget):
         root.addWidget(
             make_header(
                 "Драйверы",
-                "Текущие версии драйверов устройств, проверка Windows Update и "
-                "официальных сайтов производителей.",
+                "Версии драйверов, проверка Windows Update, официальных сайтов "
+                "производителей и устройств без драйверов.",
             )
         )
+
+        self.mobo_card = Card("Материнская плата")
+        self.mobo_card.add_row("Статус", "Определение платы…")
+        self.mobo_btn = QPushButton("ДРАЙВЕРЫ ПЛАТЫ")
+        self.mobo_btn.clicked.connect(self._open_mobo)
+        self.mobo_btn.setEnabled(False)
+        self.mobo_card.add_header_widget(self.mobo_btn)
+        root.addWidget(self.mobo_card)
 
         self.gpu_card = Card("Видеодрайвер")
         self.gpu_card.add_row("Статус", "Чтение драйверов…")
@@ -84,6 +97,10 @@ class DriversPage(QWidget):
         self.progress.setValue(0)
         root.addWidget(self.progress)
 
+        self.problems_card = Card("Не хватает драйверов")
+        self.problems_card.add_row("Статус", "Проверка устройств…")
+        root.addWidget(self.problems_card)
+
         self.table = QTableWidget(0, 5)
         self.table.setHorizontalHeaderLabels(
             ["Устройство", "Класс", "Версия", "Дата", "Поставщик"]
@@ -92,13 +109,14 @@ class DriversPage(QWidget):
         self.table.setSelectionMode(QAbstractItemView.NoSelection)
         self.table.setEditTriggers(QAbstractItemView.NoEditTriggers)
         self.table.setAlternatingRowColors(True)
+        self.table.setMinimumHeight(220)
         header = self.table.horizontalHeader()
         header.setSectionResizeMode(0, QHeaderView.Stretch)
         header.setSectionResizeMode(1, QHeaderView.ResizeToContents)
         header.setSectionResizeMode(2, QHeaderView.ResizeToContents)
         header.setSectionResizeMode(3, QHeaderView.ResizeToContents)
         header.setSectionResizeMode(4, QHeaderView.ResizeToContents)
-        root.addWidget(self.table, 1)
+        root.addWidget(self.table)
 
         self.log = LogView()
         self.log.setMaximumHeight(120)
@@ -106,6 +124,7 @@ class DriversPage(QWidget):
 
         self._displays: list[DriverInfo] = []
         self._nvidia_info: VendorDriverInfo | None = None
+        self._mobo_url = ""
         self._wu_available = False
         self._loaded = False
 
@@ -118,16 +137,32 @@ class DriversPage(QWidget):
 
     def load(self) -> None:
         self.progress.setRange(0, 0)
-        worker = Worker(list_drivers)
-        worker.signals.finished.connect(self._on_drivers)
+
+        def task(progress):
+            progress(10, "Чтение драйверов…")
+            drivers = list_drivers()
+            progress(60, "Определение материнской платы…")
+            mobo = motherboard_driver_info()
+            progress(80, "Поиск устройств без драйверов…")
+            problems = problem_devices()
+            return drivers, mobo, problems
+
+        worker = Worker(task, pass_progress=True)
+        worker.signals.progress.connect(lambda _p, m: self.status.setText(m))
+        worker.signals.finished.connect(self._on_data)
         worker.signals.failed.connect(self._on_failed)
         start_worker(worker)
 
-    def _on_drivers(self, drivers: list[DriverInfo]) -> None:
+    def _on_data(self, result) -> None:
+        drivers, mobo, problems = result
         self.progress.setRange(0, 100)
         self.progress.setValue(100)
-        self._displays = [d for d in drivers if d.device_class.upper() == "DISPLAY"]
+        self.status.setText("Данные обновлены.")
 
+        self._on_mobo(mobo)
+        self._on_problems(problems)
+
+        self._displays = [d for d in drivers if d.device_class.upper() == "DISPLAY"]
         self.gpu_card.clear()
         if self._displays:
             for driver in self._displays:
@@ -145,6 +180,40 @@ class DriversPage(QWidget):
             self.table.setItem(row, 3, QTableWidgetItem(driver.date))
             self.table.setItem(row, 4, QTableWidgetItem(driver.manufacturer))
         self.log.log(f"Найдено драйверов: {len(drivers)}")
+
+    def _on_mobo(self, mobo: MotherboardDriverInfo) -> None:
+        self._mobo_url = mobo.url
+        self.mobo_card.clear()
+        self.mobo_card.add_row("Производитель", mobo.manufacturer)
+        self.mobo_card.add_row("Модель", mobo.product)
+        if mobo.url:
+            label = self.mobo_card.add_row(
+                "Драйверы",
+                f'<a href="{mobo.url}">открыть страницу загрузки драйверов</a>',
+            )
+            label.setOpenExternalLinks(True)
+            label.setTextInteractionFlags(Qt.TextBrowserInteraction)
+            self.mobo_btn.setEnabled(True)
+
+    def _on_problems(self, problems: list[ProblemDevice]) -> None:
+        self.problems_card.clear()
+        if not problems:
+            self.problems_card.add_row(
+                "Статус", "Все устройства работают — драйверов не хватает? Нет."
+            )
+            return
+        self.problems_card.add_row("Найдено устройств", str(len(problems)))
+        for device in problems:
+            text = f"{device.status} · {device.device_class}"
+            label = self.problems_card.add_row(device.name, text)
+            if device.hardware_id:
+                label.setText(f'{text} · <a href="{device.catalog_url}">найти драйвер</a>')
+                label.setOpenExternalLinks(True)
+                label.setTextInteractionFlags(Qt.TextBrowserInteraction)
+
+    def _open_mobo(self) -> None:
+        if self._mobo_url:
+            webbrowser.open(self._mobo_url)
 
     # ------------------------------------------------------------------
     def _check(self) -> None:
