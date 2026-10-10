@@ -11,15 +11,22 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
-from ...core.win_settings import WIN_SETTINGS, WinSetting
+from ...core.win_settings import WinSetting, win_settings_for
 from ...core.workers import Worker, start_worker
 from .. import theme
 from ..widgets import Card, LogView, OptionRow, make_header
 
 
 class WinSettingsPage(QWidget):
-    def __init__(self, parent: QWidget | None = None, show_header: bool = True) -> None:
+    def __init__(
+        self,
+        game_key: str = "cs2",
+        parent: QWidget | None = None,
+        show_header: bool = True,
+    ) -> None:
         super().__init__(parent)
+        self.game_key = game_key
+        self._settings = win_settings_for(game_key)
         root = QVBoxLayout(self)
         root.setSpacing(14)
         if show_header:
@@ -41,7 +48,7 @@ class WinSettingsPage(QWidget):
 
         card = Card("Параметры")
         self._rows: list[tuple[WinSetting, OptionRow]] = []
-        for setting in WIN_SETTINGS:
+        for setting in self._settings:
             row = OptionRow(setting.name, setting.help, setting.options, setting.value)
             row.apply_requested.connect(lambda value, s=setting: self._apply_one(s, value))
             row.help_hovered.connect(self._on_help)
@@ -91,7 +98,7 @@ class WinSettingsPage(QWidget):
         self.progress.setRange(0, 0)
 
         def task():
-            return {setting.key: setting.get() for setting in WIN_SETTINGS}
+            return {setting.key: setting.get() for setting in self._settings}
 
         worker = Worker(task)
         worker.signals.finished.connect(self._on_states)
@@ -101,10 +108,16 @@ class WinSettingsPage(QWidget):
     def _on_states(self, states: dict) -> None:
         self.progress.setRange(0, 100)
         self.progress.setValue(100)
-        for setting, row in self._rows:
-            if setting.key in states:
-                row.set_value(states[setting.key])
-        self.status.setText("Текущие значения прочитаны.")
+        labels = {
+            setting.key: next(
+                (label for value, label in setting.options if value == states.get(setting.key)),
+                states.get(setting.key, "—"),
+            )
+            for setting in self._settings
+        }
+        for setting in self._settings:
+            self.log.log(f"{setting.name}: сейчас — {labels.get(setting.key, '—')}")
+        self.status.setText("Рекомендованные значения выбраны. В журнале — текущее состояние.")
         self.status.setStyleSheet(f"color: {theme.palette()['TEXT_DIM']};")
 
     def _set_busy(self, busy: bool) -> None:

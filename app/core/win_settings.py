@@ -1,12 +1,14 @@
 """Игровые настройки Windows (питание, HAGS, игровой режим и т. д.).
 
 Значения читаются и записываются в реестр/через powercfg. Часть параметров
-требует прав администратора и перезагрузки.
+требует прав администратора и перезагрузки. Пункт про оптимизации полного
+экрана строится для исполняемого файла конкретной игры.
 """
 from __future__ import annotations
 
+import os
 import re
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from typing import Callable
 
 from . import registry
@@ -27,6 +29,17 @@ _LAYERS_KEY = r"Software\Microsoft\Windows NT\CurrentVersion\AppCompatFlags\Laye
 
 _ON_OFF = [("on", "Вкл"), ("off", "Выкл")]
 
+# Исполняемые файлы игр относительно steamapps\common.
+_GAME_EXE = {
+    "cs2": ["Counter-Strike Global Offensive/game/bin/win64/cs2.exe"],
+    "dota2": ["dota 2 beta/game/bin/win64/dota2.exe"],
+    "apex": ["Apex Legends/r5apex.exe"],
+    "pubg": ["PUBG/TslGame/Binaries/Win64/TslGame.exe"],
+    "squad": ["Squad/SquadGame/Binaries/Win64/SquadGame-Win64-Shipping.exe"],
+    "dayz": ["DayZ/DayZ_x64.exe"],
+    "gtav": ["Grand Theft Auto V/GTA5.exe"],
+}
+
 
 @dataclass
 class WinSetting:
@@ -39,6 +52,22 @@ class WinSetting:
     apply: Callable[[str], tuple[bool, str]]
     requires_admin: bool = False
     note: str = ""
+
+
+def game_exe_path(game_key: str) -> str | None:
+    rels = _GAME_EXE.get(game_key, [])
+    for steam_root in _steam_roots():
+        for library in _library_roots(steam_root):
+            common = library / "steamapps" / "common"
+            for rel in rels:
+                candidate = common / rel
+                if candidate.is_file():
+                    return str(candidate)
+    return None
+
+
+def cs2_exe_path() -> str | None:
+    return game_exe_path("cs2")
 
 
 # ---------------------------------------------------------------------------
@@ -143,97 +172,86 @@ def _windowed_apply(value: str) -> tuple[bool, str]:
 
 
 # ---------------------------------------------------------------------------
-# Отключение оптимизаций полного экрана для cs2.exe
+# Полноэкранные оптимизации для exe конкретной игры
 # ---------------------------------------------------------------------------
-def cs2_exe_path() -> str | None:
-    for steam_root in _steam_roots():
-        for library in _library_roots(steam_root):
-            candidate = (
-                library / "steamapps" / "common" / "Counter-Strike Global Offensive"
-                / "game" / "bin" / "win64" / "cs2.exe"
-            )
-            if candidate.is_file():
-                return str(candidate)
-    return None
+def _fsopt_setting(game_key: str) -> WinSetting:
+    exe = game_exe_path(game_key)
+    exe_name = os.path.basename(exe) if exe else "игры"
 
-
-def _fsopt_get() -> str:
-    exe = cs2_exe_path()
-    if not exe:
+    def get() -> str:
+        if not exe:
+            return "off"
+        exists, _type, value = registry.read_value("HKCU", _LAYERS_KEY, exe)
+        if exists and "DISABLEDXMAXIMIZEDWINDOWEDMODE" in str(value):
+            return "on"
         return "off"
-    exists, _type, value = registry.read_value("HKCU", _LAYERS_KEY, exe)
-    if exists and "DISABLEDXMAXIMIZEDWINDOWEDMODE" in str(value):
-        return "on"
-    return "off"
 
+    def apply(value: str) -> tuple[bool, str]:
+        if not exe:
+            return False, "Исполняемый файл игры не найден"
+        if value == "on":
+            registry.write_value(
+                "HKCU", _LAYERS_KEY, exe, "REG_SZ", "~ DISABLEDXMAXIMIZEDWINDOWEDMODE"
+            )
+            return True, f"Оптимизации полного экрана отключены для {exe_name}"
+        registry.delete_value("HKCU", _LAYERS_KEY, exe)
+        return True, f"Оптимизации полного экрана включены для {exe_name}"
 
-def _fsopt_apply(value: str) -> tuple[bool, str]:
-    exe = cs2_exe_path()
-    if not exe:
-        return False, "cs2.exe не найден"
-    if value == "on":
-        registry.write_value(
-            "HKCU", _LAYERS_KEY, exe, "REG_SZ", "~ DISABLEDXMAXIMIZEDWINDOWEDMODE"
-        )
-        return True, "Оптимизации полного экрана отключены для cs2.exe"
-    registry.delete_value("HKCU", _LAYERS_KEY, exe)
-    return True, "Оптимизации полного экрана включены для cs2.exe"
-
-
-WIN_SETTINGS: list[WinSetting] = [
-    WinSetting(
-        key="power_plan",
-        name="Схема управления питанием",
-        help="Высокая/максимальная производительность не даёт ПК сбрасывать частоты. "
-        "На ноутбуке — только от сети.",
-        options=[
-            ("ultimate", "Максимальная производительность"),
-            ("high", "Высокая производительность"),
-            ("balanced", "Сбалансированная"),
-        ],
-        value="high",
-        get=_power_get,
-        apply=_power_apply,
-    ),
-    WinSetting(
-        key="hags",
-        name="Планирование GPU с аппаратным ускорением (HAGS)",
-        help="Позволяет GPU управлять своей памятью напрямую, снижает задержку. "
-        "Требуется перезагрузка.",
-        options=list(_ON_OFF),
-        value="on",
-        get=_hags_get,
-        apply=_hags_apply,
-        requires_admin=True,
-    ),
-    WinSetting(
-        key="game_mode",
-        name="Игровой режим",
-        help="Даёт игре приоритет процессора/графики и откладывает обновления. "
-        "На старых ПК иногда помогает выключение.",
-        options=list(_ON_OFF),
-        value="on",
-        get=_game_mode_get,
-        apply=_game_mode_apply,
-    ),
-    WinSetting(
-        key="windowed_opt",
-        name="Оптимизация для оконных игр",
-        help="Снижает задержку в оконном/безрамочном режиме и включает Auto HDR/VRR.",
+    return WinSetting(
+        key="fsopt",
+        name=f"Отключить оптимизации полного экрана для {exe_name}",
+        help="Помогает при проблемах с alt-tab и полноэкранным режимом.",
         options=list(_ON_OFF),
         value="off",
-        get=_windowed_get,
-        apply=_windowed_apply,
-    ),
-    WinSetting(
-        key="fsopt_cs2",
-        name="Отключить оптимизации полного экрана для cs2.exe",
-        help="Помогает при проблемах с alt-tab и полноэкранным режимом в CS2.",
-        options=list(_ON_OFF),
-        value="off",
-        get=_fsopt_get,
-        apply=_fsopt_apply,
-    ),
-]
+        get=get,
+        apply=apply,
+    )
 
-WIN_SETTINGS_BY_KEY = {s.key: s for s in WIN_SETTINGS}
+
+def win_settings_for(game_key: str = "cs2") -> list[WinSetting]:
+    return [
+        WinSetting(
+            key="power_plan",
+            name="Схема управления питанием",
+            help="Высокая/максимальная производительность не даёт ПК сбрасывать частоты. "
+            "На ноутбуке — только от сети.",
+            options=[
+                ("ultimate", "Максимальная производительность"),
+                ("high", "Высокая производительность"),
+                ("balanced", "Сбалансированная"),
+            ],
+            value="high",
+            get=_power_get,
+            apply=_power_apply,
+        ),
+        WinSetting(
+            key="hags",
+            name="Планирование GPU с аппаратным ускорением (HAGS)",
+            help="Позволяет GPU управлять своей памятью напрямую, снижает задержку. "
+            "Требуется перезагрузка.",
+            options=list(_ON_OFF),
+            value="on",
+            get=_hags_get,
+            apply=_hags_apply,
+            requires_admin=True,
+        ),
+        WinSetting(
+            key="game_mode",
+            name="Игровой режим",
+            help="Даёт игре приоритет процессора/графики и откладывает обновления.",
+            options=list(_ON_OFF),
+            value="on",
+            get=_game_mode_get,
+            apply=_game_mode_apply,
+        ),
+        WinSetting(
+            key="windowed_opt",
+            name="Оптимизация для оконных игр",
+            help="Снижает задержку в оконном/безрамочном режиме и включает Auto HDR/VRR.",
+            options=list(_ON_OFF),
+            value="off",
+            get=_windowed_get,
+            apply=_windowed_apply,
+        ),
+        _fsopt_setting(game_key),
+    ]

@@ -330,7 +330,7 @@ class _GamePanel(QWidget):
         pages: list[QWidget] = [
             settings_section,
             NvidiaPage(profile.key, show_header=False),
-            WinSettingsPage(show_header=False),
+            WinSettingsPage(profile.key, show_header=False),
         ]
         for index, title in enumerate(SECTIONS):
             button = QPushButton(title)
