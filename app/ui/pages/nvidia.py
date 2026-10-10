@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import os
 
+from PySide6.QtCore import Qt
 from PySide6.QtGui import QGuiApplication
 from PySide6.QtWidgets import (
     QHBoxLayout,
@@ -17,7 +18,14 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
-from ...core.nvidia import format_profile, profile_for
+from ...core.nvidia import (
+    PRESETS,
+    PRESETS_BY_KEY,
+    format_profile,
+    load_saved,
+    profile_for,
+    save_profile,
+)
 from ...core.win_settings import cs2_exe_path
 from ...utils import open_path
 from ..widgets import Card, LogView, OptionRow, make_header
@@ -73,6 +81,23 @@ class NvidiaPage(QWidget):
         self.help_label.setWordWrap(True)
         root.addWidget(self.help_label)
 
+        preset_row = QHBoxLayout()
+        preset_row.setSpacing(8)
+        preset_label = QLabel("Профиль:")
+        preset_label.setObjectName("Caption")
+        preset_row.addWidget(preset_label)
+        self._preset_buttons: list[QPushButton] = []
+        for key, label, _values in PRESETS:
+            button = QPushButton(label)
+            button.setObjectName("Segment")
+            button.setCheckable(True)
+            button.setCursor(Qt.PointingHandCursor)
+            button.clicked.connect(lambda _checked=False, k=key: self._apply_preset(k))
+            preset_row.addWidget(button)
+            self._preset_buttons.append(button)
+        preset_row.addStretch(1)
+        root.addLayout(preset_row)
+
         card = Card("Параметры драйвера NVIDIA")
         self._rows: list[tuple[object, OptionRow]] = []
         for setting in self.settings:
@@ -83,8 +108,11 @@ class NvidiaPage(QWidget):
         root.addWidget(card)
 
         controls = QHBoxLayout()
+        apply_btn = QPushButton("ПРИМЕНИТЬ ВЫБРАННОЕ")
+        apply_btn.setObjectName("Primary")
+        apply_btn.clicked.connect(self._apply)
+        controls.addWidget(apply_btn)
         copy_btn = QPushButton("СКОПИРОВАТЬ СПИСОК")
-        copy_btn.setObjectName("Primary")
         copy_btn.clicked.connect(self._copy)
         controls.addWidget(copy_btn)
         app_btn = QPushButton("ОТКРЫТЬ NVIDIA APP")
@@ -105,7 +133,37 @@ class NvidiaPage(QWidget):
         root.addWidget(self.log)
         root.addStretch(1)
 
+        self._loaded = False
+
     # ------------------------------------------------------------------
+    def showEvent(self, event) -> None:  # noqa: N802 - Qt API
+        super().showEvent(event)
+        if self._loaded:
+            return
+        self._loaded = True
+        saved = load_saved(self.game_key)
+        if saved:
+            for setting, row in self._rows:
+                if setting.key in saved:
+                    row.set_value(saved[setting.key])
+            self.log.log("Загружен сохранённый профиль NVIDIA для этой игры.")
+
+    def _apply_preset(self, key: str) -> None:
+        values = PRESETS_BY_KEY.get(key, {})
+        for setting, row in self._rows:
+            if setting.key in values:
+                row.set_value(values[setting.key])
+        for button, (preset_key, _label, _values) in zip(self._preset_buttons, PRESETS):
+            button.setChecked(preset_key == key)
+        label = next((l for k, l, _v in PRESETS if k == key), key)
+        self.log.log(f"Выбран профиль «{label}».")
+
+    def _apply(self) -> None:
+        values = self._values()
+        save_profile(self.game_key, values)
+        QGuiApplication.clipboard().setText(format_profile(self.settings, values))
+        self.log.log("Значения сохранены и скопированы в буфер обмена — вставьте в NVIDIA App.")
+
     def _on_help(self, text: str) -> None:
         self.help_label.setText(
             text or "Наведите на значок (i), чтобы узнать, что делает параметр."

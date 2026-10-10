@@ -8,6 +8,8 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
+from ..config import load_json, save_json
+
 _ON_OFF = [("on", "Вкл"), ("off", "Выкл")]
 _LOW_LATENCY = [("off", "Выкл"), ("on", "Вкл"), ("ultra", "Ультра")]
 _POWER = [
@@ -104,6 +106,91 @@ NVIDIA_PROFILES: dict[str, list[NvidiaSetting]] = {
 
 def profile_for(game_key: str) -> list[NvidiaSetting]:
     return NVIDIA_PROFILES.get(game_key, NVIDIA_PROFILES["cs2"])
+
+
+# ---------------------------------------------------------------------------
+# Готовые профили (переключение одним нажатием)
+# ---------------------------------------------------------------------------
+PRESETS: list[tuple[str, str, dict[str, str]]] = [
+    (
+        "fps",
+        "МАКС. FPS",
+        {
+            "image_scaling": "off",
+            "low_latency": "ultra",
+            "power": "max",
+            "tex_quality": "highperf",
+            "neg_lod": "allow",
+            "aniso_sample": "on",
+            "trilinear": "on",
+            "threaded": "on",
+            "vsync": "off",
+            "refresh": "highest",
+            "shader_cache": "10",
+            "monitor": "fixed",
+            "max_fps": "off",
+            "bg_fps": "off",
+            "present": "layered",
+        },
+    ),
+    (
+        "balanced",
+        "БАЛАНС",
+        {
+            "image_scaling": "off",
+            "low_latency": "on",
+            "power": "max",
+            "tex_quality": "quality",
+            "neg_lod": "allow",
+            "aniso_sample": "on",
+            "trilinear": "on",
+            "threaded": "on",
+            "vsync": "off",
+            "refresh": "highest",
+            "shader_cache": "5",
+            "monitor": "fixed",
+            "max_fps": "141",
+            "bg_fps": "off",
+            "present": "layered",
+        },
+    ),
+    (
+        "quality",
+        "КАЧЕСТВО",
+        {
+            "image_scaling": "off",
+            "low_latency": "on",
+            "power": "max",
+            "tex_quality": "highquality",
+            "neg_lod": "clamp",
+            "aniso_sample": "off",
+            "trilinear": "off",
+            "threaded": "on",
+            "vsync": "off",
+            "refresh": "highest",
+            "shader_cache": "unlimited",
+            "monitor": "gsync",
+            "max_fps": "off",
+            "bg_fps": "off",
+            "present": "layered",
+        },
+    ),
+]
+
+PRESETS_BY_KEY = {key: values for key, _label, values in PRESETS}
+
+
+def _profile_file(game_key: str) -> str:
+    return f"nvidia_{game_key}.json"
+
+
+def load_saved(game_key: str) -> dict:
+    data = load_json(_profile_file(game_key), {})
+    return data if isinstance(data, dict) else {}
+
+
+def save_profile(game_key: str, values: dict) -> None:
+    save_json(_profile_file(game_key), values)
 
 
 def format_profile(settings: list[NvidiaSetting], values: dict[str, str]) -> str:

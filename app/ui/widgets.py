@@ -4,7 +4,7 @@ from __future__ import annotations
 from datetime import datetime
 
 from PySide6.QtCore import QRectF, Qt, Signal
-from PySide6.QtGui import QColor, QIcon, QPainter, QPainterPath, QPen, QPixmap
+from PySide6.QtGui import QColor, QCursor, QIcon, QPainter, QPainterPath, QPen, QPixmap
 from PySide6.QtWidgets import (
     QAbstractButton,
     QComboBox,
@@ -15,6 +15,7 @@ from PySide6.QtWidgets import (
     QPlainTextEdit,
     QPushButton,
     QScrollArea,
+    QToolTip,
     QVBoxLayout,
     QWidget,
 )
@@ -185,10 +186,12 @@ class InfoIcon(QLabel):
         self.setToolTip(text)
 
     def enterEvent(self, event) -> None:  # noqa: N802 - Qt API
+        QToolTip.showText(QCursor.pos(), self._text, self)
         self.hovered.emit(self._text)
         super().enterEvent(event)
 
     def leaveEvent(self, event) -> None:  # noqa: N802 - Qt API
+        QToolTip.hideText()
         self.hovered.emit("")
         super().leaveEvent(event)
 
