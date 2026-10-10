@@ -10,6 +10,7 @@
 """
 from __future__ import annotations
 
+import json
 import os
 import re
 import shutil
@@ -58,7 +59,7 @@ GAMES: list[GameProfile] = [
     GameProfile(
         key="cs2",
         name="Counter-Strike 2",
-        logo="games/cs2-logo.png",
+        logo="games/cs2-cover.png",
         kind="vdf",
         locator="steam:730:local/cfg/cs2_video.txt",
         settings=[
@@ -122,7 +123,7 @@ GAMES: list[GameProfile] = [
     GameProfile(
         key="dota2",
         name="Dota 2",
-        logo="games/dota2-logo.png",
+        logo="games/dota2-cover.png",
         kind="vdf",
         locator="steam:570:remote/cfg/video.txt",
         settings=[
@@ -163,7 +164,7 @@ GAMES: list[GameProfile] = [
     GameProfile(
         key="apex",
         name="Apex Legends",
-        logo="games/apex-logo.png",
+        logo="games/apex-cover.png",
         kind="vdf",
         locator="apex",
         settings=[
@@ -211,7 +212,7 @@ GAMES: list[GameProfile] = [
     GameProfile(
         key="pubg",
         name="PUBG: Battlegrounds",
-        logo="games/pubg-logo.png",
+        logo="games/pubg-cover.png",
         kind="ini",
         locator="pubg",
         settings=[
@@ -441,6 +442,28 @@ def _backup_name(profile: GameProfile, path: Path) -> str:
     return f"{profile.key}_{account}_{path.name}"
 
 
+def _manifest_path(profile: GameProfile) -> Path:
+    return app_data_dir() / BACKUP_DIRNAME / f"{profile.key}_manifest.json"
+
+
+def _read_manifest(profile: GameProfile) -> dict:
+    path = _manifest_path(profile)
+    try:
+        data = json.loads(path.read_text(encoding="utf-8"))
+        return data if isinstance(data, dict) else {}
+    except (OSError, ValueError):
+        return {}
+
+
+def _write_manifest(profile: GameProfile, manifest: dict) -> None:
+    path = _manifest_path(profile)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    try:
+        path.write_text(json.dumps(manifest, ensure_ascii=False, indent=2), encoding="utf-8")
+    except OSError:
+        pass
+
+
 def apply_setting_values(
     profile: GameProfile, items: list[tuple[Setting, str]], progress=None
 ) -> GameSettingsResult:
@@ -456,6 +479,7 @@ def apply_setting_values(
 
     backup_dir = app_data_dir() / BACKUP_DIRNAME
     backup_dir.mkdir(parents=True, exist_ok=True)
+    manifest = _read_manifest(profile)
 
     changed: list[str] = []
     total = max(len(files), 1)
@@ -466,15 +490,20 @@ def apply_setting_values(
             text = path.read_text(encoding="utf-8", errors="replace")
         except OSError:
             continue
-        try:
-            shutil.copy2(path, backup_dir / _backup_name(profile, path))
-        except OSError:
-            pass
+        backup_file = backup_dir / _backup_name(profile, path)
+        if not backup_file.exists():
+            try:
+                shutil.copy2(path, backup_file)
+                manifest[str(path)] = str(backup_file)
+            except OSError:
+                pass
         try:
             path.write_text(_apply_text(profile, text, items), encoding="utf-8")
             changed.append(str(path))
         except OSError:
             continue
+
+    _write_manifest(profile, manifest)
 
     if progress:
         progress(100, "Готово")
@@ -485,6 +514,55 @@ def apply_setting_values(
         f"Применено настроек: {len(items)} · профилей: {len(changed)}.",
         changed,
         str(backup_dir),
+    )
+
+
+def restore_game_settings(profile: GameProfile, progress=None) -> GameSettingsResult:
+    """Возвращает исходные файлы настроек игры из резервной копии."""
+    if profile.key in running_game_keys():
+        return GameSettingsResult(False, f"Закройте {profile.name} и повторите.")
+
+    manifest = _read_manifest(profile)
+    if not manifest:
+        return GameSettingsResult(False, f"Резервные копии {profile.name} не найдены.")
+
+    restored: list[str] = []
+    total = max(len(manifest), 1)
+    for index, (original, backup) in enumerate(manifest.items()):
+        if progress:
+            progress(int(index / total * 100), f"Откат: {profile.name}…")
+        backup_path = Path(backup)
+        original_path = Path(original)
+        if not backup_path.is_file():
+            continue
+        try:
+            original_path.parent.mkdir(parents=True, exist_ok=True)
+            shutil.copy2(backup_path, original_path)
+            restored.append(str(original_path))
+        except OSError:
+            continue
+
+    # Удаляем использованные копии и манифест, чтобы следующее применение
+    # снова сохранило исходное состояние.
+    for _original, backup in manifest.items():
+        try:
+            Path(backup).unlink(missing_ok=True)
+        except OSError:
+            pass
+    try:
+        _manifest_path(profile).unlink(missing_ok=True)
+    except OSError:
+        pass
+
+    if progress:
+        progress(100, "Готово")
+    if not restored:
+        return GameSettingsResult(False, "Не удалось восстановить файлы.")
+    return GameSettingsResult(
+        True,
+        f"Настройки {profile.name} возвращены к исходным ({len(restored)} файлов).",
+        restored,
+        str(app_data_dir() / BACKUP_DIRNAME),
     )
 
 
