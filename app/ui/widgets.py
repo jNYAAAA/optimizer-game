@@ -3,20 +3,23 @@ from __future__ import annotations
 
 from datetime import datetime
 
-from PySide6.QtCore import QRectF, Qt
+from PySide6.QtCore import QRectF, Qt, Signal
 from PySide6.QtGui import QColor, QIcon, QPainter, QPainterPath, QPen, QPixmap
 from PySide6.QtWidgets import (
     QAbstractButton,
+    QComboBox,
     QFrame,
     QGridLayout,
     QHBoxLayout,
     QLabel,
     QPlainTextEdit,
+    QPushButton,
     QScrollArea,
     QVBoxLayout,
     QWidget,
 )
 
+from ..utils import resource_path
 from . import theme
 
 
@@ -167,6 +170,78 @@ class ThemeToggleButton(QAbstractButton):
         painter.end()
 
 
+class InfoIcon(QLabel):
+    """Значок «i» с пояснением, всплывающим при наведении."""
+
+    hovered = Signal(str)
+
+    def __init__(self, text: str, parent: QWidget | None = None) -> None:
+        super().__init__(parent)
+        self._text = text
+        pixmap = QPixmap(resource_path("assets/info.png"))
+        if not pixmap.isNull():
+            self.setPixmap(pixmap)
+        self.setCursor(Qt.WhatsThisCursor)
+        self.setToolTip(text)
+
+    def enterEvent(self, event) -> None:  # noqa: N802 - Qt API
+        self.hovered.emit(self._text)
+        super().enterEvent(event)
+
+    def leaveEvent(self, event) -> None:  # noqa: N802 - Qt API
+        self.hovered.emit("")
+        super().leaveEvent(event)
+
+
+class OptionRow(QWidget):
+    """Строка настройки: значок «i», название, список значений и «Применить»."""
+
+    apply_requested = Signal(str)
+    help_hovered = Signal(str)
+
+    def __init__(
+        self,
+        label: str,
+        help_text: str,
+        options: list[tuple[str, str]],
+        current: str = "",
+        parent: QWidget | None = None,
+    ) -> None:
+        super().__init__(parent)
+        layout = QHBoxLayout(self)
+        layout.setContentsMargins(0, 3, 0, 3)
+        layout.setSpacing(8)
+
+        self.info = InfoIcon(help_text or label)
+        self.info.hovered.connect(self.help_hovered.emit)
+        layout.addWidget(self.info)
+
+        name = QLabel(label)
+        name.setObjectName("Caption")
+        name.setWordWrap(True)
+        layout.addWidget(name, 1)
+
+        self.combo = QComboBox()
+        for value, text in options:
+            self.combo.addItem(text, value)
+        self.set_value(current)
+        self.combo.setMinimumWidth(180)
+        layout.addWidget(self.combo)
+
+        self.apply_btn = QPushButton("ПРИМЕНИТЬ")
+        self.apply_btn.setObjectName("Segment")
+        self.apply_btn.clicked.connect(lambda: self.apply_requested.emit(self.combo.currentData()))
+        layout.addWidget(self.apply_btn)
+
+    def value(self) -> str:
+        return self.combo.currentData()
+
+    def set_value(self, value: str) -> None:
+        index = self.combo.findData(value)
+        if index >= 0:
+            self.combo.setCurrentIndex(index)
+
+
 def nav_icon(kind: str, color: str, size: int = 22) -> QIcon:
     """Рисует простую иконку для бокового меню в цвете темы."""
     pixmap = QPixmap(size, size)
@@ -226,6 +301,20 @@ def nav_icon(kind: str, color: str, size: int = 22) -> QIcon:
             x2 = s / 2 + math.cos(angle) * s * 0.42
             y2 = s / 2 + math.sin(angle) * s * 0.42
             line(x1, y1, x2, y2)
+    elif kind == "windows":
+        side = s * 0.32
+        gap = s * 0.10
+        off = s * 0.14
+        for i in range(2):
+            for j in range(2):
+                x = off + j * (side + gap)
+                y = off + i * (side + gap)
+                painter.drawRoundedRect(QRectF(x, y, side, side), 1.5, 1.5)
+    elif kind == "nvidia":
+        painter.drawEllipse(QRectF(s * 0.10, s * 0.28, s * 0.80, s * 0.44))
+        painter.setBrush(QColor(color))
+        painter.drawEllipse(QRectF(s * 0.40, s * 0.42, s * 0.20, s * 0.16))
+        painter.setBrush(Qt.NoBrush)
     painter.end()
     return QIcon(pixmap)
 
