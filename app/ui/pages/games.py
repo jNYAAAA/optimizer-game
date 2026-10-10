@@ -159,15 +159,20 @@ class _GamePanel(QWidget):
         root.addLayout(top)
 
         header = QHBoxLayout()
-        header.setSpacing(16)
+        header.setSpacing(18)
         cover = QLabel()
-        cover.setPixmap(_cover_pixmap(profile, 110, 165))
+        cover.setPixmap(_cover_pixmap(profile, 170, 255))
         header.addWidget(cover, 0, Qt.AlignTop)
         info = QVBoxLayout()
         info.setSpacing(6)
         name = QLabel(profile.name)
         name.setObjectName("PageTitle")
         info.addWidget(name)
+        caption = QLabel(
+            f"{len(profile.settings)} настроек · профиль «максимум FPS без потери качества»"
+        )
+        caption.setObjectName("Caption")
+        info.addWidget(caption)
         self.help_label = QLabel("Наведите на значок (i), чтобы узнать, за что отвечает настройка.")
         self.help_label.setObjectName("PageHint")
         self.help_label.setWordWrap(True)
@@ -209,6 +214,7 @@ class _GamePanel(QWidget):
         self.log = LogView()
         self.log.setMaximumHeight(90)
         root.addWidget(self.log)
+        root.addStretch(1)
 
         self._loaded = False
 
