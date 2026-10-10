@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 from PySide6.QtCore import QTimer
+from PySide6.QtGui import QGuiApplication
 from PySide6.QtWidgets import (
     QFrame,
     QGridLayout,
@@ -12,7 +13,7 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
-from ...core.hardware import SystemInfo, collect_system_info, live_stats
+from ...core.hardware import MonitorInfo, SystemInfo, collect_system_info, live_stats
 from ...core.sensors import SensorReading, collect_temperatures
 from ...core.workers import Worker, start_worker
 from ...utils import format_bytes, format_mhz
@@ -212,6 +213,23 @@ class DashboardPage(QWidget):
         else:
             self.gpu_card.add_row("Видеокарта", "Данные недоступны")
 
+        monitors = self._collect_monitors()
+        if monitors:
+            self.gpu_card.add_row("Мониторов", str(len(monitors)))
+            for index, monitor in enumerate(monitors, 1):
+                model = monitor.model if monitor.model and monitor.model != "—" else monitor.device
+                manufacturer = monitor.manufacturer or ""
+                if manufacturer and manufacturer != "—" and manufacturer.lower() not in model.lower():
+                    model = f"{manufacturer} {model}"
+                label = f"Монитор {index}" + (" · основной" if monitor.primary else "")
+                resolution = (
+                    f"{monitor.width}×{monitor.height}"
+                    if monitor.width and monitor.height
+                    else "—"
+                )
+                refresh = f" @ {monitor.refresh:.0f} Гц" if monitor.refresh else ""
+                self.gpu_card.add_row(label, f"{resolution}{refresh} · {model}")
+
         self.disk_card.clear()
         if info.disks:
             for index, disk in enumerate(info.disks, 1):
@@ -297,3 +315,27 @@ class DashboardPage(QWidget):
         self._sensors_busy = False
         self.sensors_card.clear()
         self.sensors_card.add_row("Статус", f"Не удалось прочитать датчики: {message}")
+
+    @staticmethod
+    def _collect_monitors() -> list[MonitorInfo]:
+        """Мониторы через Qt: физическое разрешение, частота, модель."""
+        primary_screen = QGuiApplication.primaryScreen()
+        primary_name = primary_screen.name() if primary_screen else ""
+        monitors: list[MonitorInfo] = []
+        for index, screen in enumerate(QGuiApplication.screens(), 1):
+            geometry = screen.geometry()
+            ratio = screen.devicePixelRatio() or 1.0
+            monitors.append(
+                MonitorInfo(
+                    device=screen.name() or f"Дисплей {index}",
+                    model=screen.model() or "—",
+                    manufacturer=screen.manufacturer() or "—",
+                    width=int(round(geometry.width() * ratio)),
+                    height=int(round(geometry.height() * ratio)),
+                    refresh=float(screen.refreshRate() or 0.0),
+                    primary=bool(screen.name() and screen.name() == primary_name),
+                    x=geometry.x(),
+                    y=geometry.y(),
+                )
+            )
+        return monitors

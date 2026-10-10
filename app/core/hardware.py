@@ -153,6 +153,19 @@ class GpuInfo:
 
 
 @dataclass
+class MonitorInfo:
+    device: str = "—"
+    model: str = "—"
+    manufacturer: str = "—"
+    width: int = 0
+    height: int = 0
+    refresh: float = 0.0
+    primary: bool = False
+    x: int = 0
+    y: int = 0
+
+
+@dataclass
 class DiskInfo:
     friendly_name: str = "—"
     media_type: str = "—"
@@ -202,6 +215,7 @@ class SystemInfo:
     cpu: CpuInfo = field(default_factory=CpuInfo)
     ram: RamInfo = field(default_factory=RamInfo)
     gpus: list[GpuInfo] = field(default_factory=list)
+    monitors: list[MonitorInfo] = field(default_factory=list)
     disks: list[DiskInfo] = field(default_factory=list)
     partitions: list[PartitionInfo] = field(default_factory=list)
     os_info: OsInfo = field(default_factory=OsInfo)
