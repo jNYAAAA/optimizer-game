@@ -278,6 +278,218 @@ GAMES: list[GameProfile] = [
             ),
         ],
     ),
+    GameProfile(
+        key="squad",
+        name="Squad",
+        logo="games/squad-cover.png",
+        kind="ini",
+        locator="squad",
+        settings=[
+            Setting(
+                "bUseVSync", "False", "Вертикальная синхронизация", "/Script/Squad.SQGameUserSettings",
+                help="Привязка кадров к монитору; добавляет задержку.",
+                options=[("False", "Выкл"), ("True", "Вкл")],
+            ),
+            Setting(
+                "bUseDynamicResolution", "False", "Динамическое разрешение", "/Script/Squad.SQGameUserSettings",
+                help="Автоматически меняет разрешение под нагрузкой.",
+                options=[("False", "Выкл"), ("True", "Вкл")],
+            ),
+            Setting(
+                "FrameRateLimit", "240.000000", "Лимит FPS", "/Script/Squad.SQGameUserSettings",
+                help="Ограничение частоты кадров.",
+                options=[("0.000000", "Без ограничений"), ("144.000000", "144"), ("240.000000", "240")],
+            ),
+            Setting(
+                "ScreenPercentage", "(Value=100)", "Масштаб разрешения", "/Script/Squad.SQGameUserSettings",
+                help="Разрешение рендера. 100% — максимальная чёткость.",
+                options=[("(Value=100)", "100%"), ("(Value=85)", "85%"), ("(Value=70)", "70%")],
+            ),
+            Setting(
+                "ReflexMode", "Off", "NVIDIA Reflex", "/Script/Squad.SQGameUserSettings",
+                help="Снижает задержку ввода.",
+                options=[("Off", "Выкл"), ("On", "Вкл"), ("OnPlusBoost", "Вкл + Boost")],
+            ),
+            Setting(
+                "AmbientOcclusion", "(Value=0)", "Ambient Occlusion", "/Script/Squad.SQGameUserSettings",
+                help="Контактное затенение. Стоит FPS без игровой пользы.",
+                options=[("(Value=0)", "Выкл"), ("(Value=1)", "Вкл")],
+            ),
+            Setting(
+                "sg.ResolutionQuality", "100", "Масштаб разрешения (scalability)", "ScalabilityGroups",
+                help="Разрешение рендера в группах качества.",
+                options=[("100", "100%"), ("85", "85%"), ("70", "70%")],
+            ),
+            Setting(
+                "sg.ViewDistanceQuality", "2", "Дальность прорисовки", "ScalabilityGroups",
+                help="Насколько далеко видны объекты и игроки.",
+                options=[("0", "Очень низкое"), ("1", "Низкое"), ("2", "Среднее"), ("3", "Высокое")],
+            ),
+            Setting(
+                "sg.AntiAliasingQuality", "2", "Сглаживание", "ScalabilityGroups",
+                help="Сглаживание краёв.",
+                options=[("0", "Выкл"), ("1", "Низкое"), ("2", "Среднее"), ("3", "Высокое")],
+            ),
+            Setting(
+                "sg.ShadowQuality", "1", "Тени", "ScalabilityGroups",
+                help="Качество теней.",
+                options=[("0", "Очень низкое"), ("1", "Низкое"), ("2", "Среднее"), ("3", "Высокое")],
+            ),
+            Setting(
+                "sg.ReflectionQuality", "0", "Отражения", "ScalabilityGroups",
+                help="Качество отражений.",
+                options=[("0", "Очень низкое"), ("1", "Низкое"), ("2", "Среднее"), ("3", "Высокое")],
+            ),
+            Setting(
+                "sg.TextureQuality", "2", "Текстуры", "ScalabilityGroups",
+                help="Качество текстур.",
+                options=[("0", "Очень низкое"), ("1", "Низкое"), ("2", "Среднее"), ("3", "Высокое")],
+            ),
+            Setting(
+                "sg.PostProcessQuality", "1", "Постобработка", "ScalabilityGroups",
+                help="Эффекты постобработки.",
+                options=[("0", "Очень низкое"), ("1", "Низкое"), ("2", "Среднее"), ("3", "Высокое")],
+            ),
+            Setting(
+                "sg.FoliageQuality", "1", "Растительность", "ScalabilityGroups",
+                help="Плотность травы и листвы.",
+                options=[("0", "Очень низкое"), ("1", "Низкое"), ("2", "Среднее"), ("3", "Высокое")],
+            ),
+        ],
+    ),
+    GameProfile(
+        key="dayz",
+        name="DayZ",
+        logo="games/dayz-cover.png",
+        kind="cfg",
+        locator="dayz",
+        settings=[
+            Setting(
+                "VSync", "0", "Вертикальная синхронизация",
+                help="Привязка кадров к монитору; добавляет задержку.",
+                options=[("0", "Выкл"), ("1", "Вкл")],
+            ),
+            Setting(
+                "MSAA", "0", "Сглаживание (MSAA)",
+                help="Сглаживание краёв геометрии.",
+                options=[("0", "Выкл"), ("2", "2x"), ("4", "4x"), ("8", "8x")],
+            ),
+            Setting(
+                "PostFX", "0", "Постобработка",
+                help="Размытие, свечение и другие эффекты.",
+                options=[("0", "Выкл"), ("1", "Низкое"), ("2", "Среднее"), ("3", "Высокое")],
+            ),
+            Setting(
+                "FXAO", "0", "Ambient Occlusion",
+                help="Контактное затенение.",
+                options=[("0", "Выкл"), ("1", "Вкл")],
+            ),
+            Setting(
+                "AToC", "0", "AToC",
+                help="Сглаживание прозрачности (alpha to coverage).",
+                options=[("0", "Выкл"), ("1", "Вкл")],
+            ),
+            Setting(
+                "AnisoFilter", "0", "Анизотропная фильтрация",
+                help="Чёткость текстур под углом.",
+                options=[("0", "Выкл"), ("1", "Низкое"), ("2", "Среднее"), ("3", "Высокое")],
+            ),
+            Setting(
+                "TerrainDetail", "0", "Детализация ландшафта",
+                help="Детализация рельефа и травы.",
+                options=[("0", "Низкое"), ("1", "Среднее"), ("2", "Высокое")],
+            ),
+            Setting(
+                "FXAA", "0", "FXAA",
+                help="Быстрое сглаживание постобработкой.",
+                options=[("0", "Выкл"), ("1", "Вкл")],
+            ),
+        ],
+    ),
+    GameProfile(
+        key="gtav",
+        name="Grand Theft Auto V",
+        logo="games/gtav-cover.png",
+        kind="xml",
+        locator="gtav",
+        settings=[
+            Setting(
+                "TextureQuality", "2", "Качество текстур",
+                help="Разрешение текстур. Держите высоким — почти не влияет на FPS.",
+                options=[("0", "Низкое"), ("1", "Среднее"), ("2", "Высокое")],
+            ),
+            Setting(
+                "ShaderQuality", "1", "Качество шейдеров",
+                help="Сложность шейдеров и освещения.",
+                options=[("0", "Низкое"), ("1", "Среднее"), ("2", "Высокое")],
+            ),
+            Setting(
+                "ShadowQuality", "1", "Качество теней",
+                help="Качество теней. Низкое/среднее даёт заметный прирост FPS.",
+                options=[("0", "Низкое"), ("1", "Среднее"), ("2", "Высокое")],
+            ),
+            Setting(
+                "ReflectionQuality", "0", "Качество отражений",
+                help="Отражения на мокрых поверхностях и машинах.",
+                options=[("0", "Низкое"), ("1", "Среднее"), ("2", "Высокое")],
+            ),
+            Setting(
+                "ReflectionMSAA", "0", "Сглаживание отражений",
+                help="MSAA для отражений.",
+                options=[("0", "Выкл"), ("1", "2x"), ("2", "4x"), ("3", "8x")],
+            ),
+            Setting(
+                "SSAO", "0", "Ambient Occlusion",
+                help="Контактное затенение в углах.",
+                options=[("0", "Выкл"), ("1", "Низкое"), ("2", "Высокое")],
+            ),
+            Setting(
+                "AnisotropicFiltering", "2", "Анизотропная фильтрация",
+                help="Чёткость текстур под углом.",
+                options=[("0", "x1"), ("1", "x2"), ("2", "x4"), ("3", "x8"), ("4", "x16")],
+            ),
+            Setting(
+                "MSAA", "0", "MSAA",
+                help="Сглаживание краёв. Стоит FPS.",
+                options=[("0", "Выкл"), ("1", "2x"), ("2", "4x"), ("3", "8x")],
+            ),
+            Setting(
+                "ParticleQuality", "0", "Качество частиц",
+                help="Плотность частиц (дым, искры).",
+                options=[("0", "Низкое"), ("1", "Среднее"), ("2", "Высокое")],
+            ),
+            Setting(
+                "WaterQuality", "1", "Качество воды",
+                help="Детализация воды.",
+                options=[("0", "Низкое"), ("1", "Среднее"), ("2", "Высокое")],
+            ),
+            Setting(
+                "GrassQuality", "1", "Качество травы",
+                help="Плотность травы.",
+                options=[("0", "Низкое"), ("1", "Среднее"), ("2", "Высокое"), ("3", "Очень высокое")],
+            ),
+            Setting(
+                "Tessellation", "1", "Тесселяция",
+                help="Детализация рельефа.",
+                options=[("0", "Выкл"), ("1", "Низкое"), ("2", "Среднее"), ("3", "Высокое")],
+            ),
+            Setting(
+                "DoF", "false", "Глубина резкости",
+                help="Размытие фона. Стоит FPS и мешает обзору.",
+                options=[("false", "Выкл"), ("true", "Вкл")],
+            ),
+            Setting(
+                "MotionBlurStrength", "0.000000", "Размытие в движении",
+                help="Размытие при движении камеры.",
+                options=[("0.000000", "Выкл"), ("0.500000", "50%"), ("1.000000", "100%")],
+            ),
+            Setting(
+                "VSync", "0", "Вертикальная синхронизация",
+                help="Привязка кадров к монитору; добавляет задержку.",
+                options=[("0", "Выкл"), ("1", "Вкл")],
+            ),
+        ],
+    ),
 ]
 
 GAMES_BY_KEY = {game.key: game for game in GAMES}
@@ -370,6 +582,19 @@ def _locate(profile: GameProfile) -> list[Path]:
         base = Path(os.environ.get("LOCALAPPDATA", "")) / "TslGame" / "Saved" / "Config" / "WindowsNoEditor"
         candidate = base / "GameUserSettings.ini"
         return [candidate] if candidate.is_file() else []
+    if locator == "squad":
+        base = Path(os.environ.get("LOCALAPPDATA", "")) / "SquadGame" / "Saved" / "Config" / "Windows"
+        candidate = base / "GameUserSettings.ini"
+        return [candidate] if candidate.is_file() else []
+    if locator == "dayz":
+        candidate = Path(os.environ.get("USERPROFILE", "")) / "Documents" / "DayZ" / "DayZ.cfg"
+        return [candidate] if candidate.is_file() else []
+    if locator == "gtav":
+        candidate = (
+            Path(os.environ.get("USERPROFILE", ""))
+            / "Documents" / "Rockstar Games" / "GTA V" / "settings.xml"
+        )
+        return [candidate] if candidate.is_file() else []
     return []
 
 
@@ -425,10 +650,28 @@ def _set_ini_value(text: str, section: str, key: str, value: str) -> str:
     return "\n".join(lines) + "\n"
 
 
+def _set_cfg_value(text: str, key: str, value: str) -> str:
+    pattern = re.compile(r'^(\s*' + re.escape(key) + r'\s*=\s*)[^;\r\n]*;', re.MULTILINE)
+    if pattern.search(text):
+        return pattern.sub(lambda m: f"{m.group(1)}{value};", text, count=1)
+    return text.rstrip() + f"\n{key}={value};\n"
+
+
+def _set_xml_value(text: str, key: str, value: str) -> str:
+    pattern = re.compile(r'(<' + re.escape(key) + r'\s+value=")[^"]*(")', re.IGNORECASE)
+    if pattern.search(text):
+        return pattern.sub(lambda m: f"{m.group(1)}{value}{m.group(2)}", text, count=1)
+    return text
+
+
 def _apply_text(profile: GameProfile, text: str, items: list[tuple[Setting, str]]) -> str:
     for setting, value in items:
         if profile.kind == "ini":
             text = _set_ini_value(text, setting.section, setting.key, value)
+        elif profile.kind == "xml":
+            text = _set_xml_value(text, setting.key, value)
+        elif profile.kind == "cfg":
+            text = _set_cfg_value(text, setting.key, value)
         else:
             text = _set_vdf_value(text, setting.key, value)
     return text

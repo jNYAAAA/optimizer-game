@@ -32,7 +32,7 @@ from ...utils import resource_path
 from .. import theme
 from ..widgets import Card, LogView, make_header
 
-COVER_W, COVER_H = 150, 225
+COVER_W, COVER_H = 190, 285
 
 
 def _cover_pixmap(profile: GameProfile, width: int, height: int) -> QPixmap:
@@ -49,11 +49,11 @@ class _GameTile(QFrame):
         super().__init__(parent)
         self.setObjectName("Card")
         self.setCursor(Qt.PointingHandCursor)
-        self.setFixedSize(210, 310)
+        self.setFixedSize(250, 390)
 
         layout = QVBoxLayout(self)
-        layout.setContentsMargins(14, 14, 14, 12)
-        layout.setSpacing(10)
+        layout.setContentsMargins(16, 16, 16, 14)
+        layout.setSpacing(12)
 
         cover = QLabel()
         cover.setAlignment(Qt.AlignCenter)
@@ -63,9 +63,9 @@ class _GameTile(QFrame):
         layout.addWidget(cover, 0, Qt.AlignHCenter)
 
         name = QLabel(profile.name)
-        name.setObjectName("Value")
         name.setAlignment(Qt.AlignCenter)
         name.setWordWrap(True)
+        name.setStyleSheet("font-size: 15px; font-weight: 600;")
         layout.addWidget(name)
         layout.addStretch(1)
 
@@ -157,7 +157,7 @@ class _GamePanel(QWidget):
         header = QHBoxLayout()
         header.setSpacing(16)
         cover = QLabel()
-        cover.setPixmap(_cover_pixmap(profile, 96, 144))
+        cover.setPixmap(_cover_pixmap(profile, 110, 165))
         header.addWidget(cover, 0, Qt.AlignTop)
         info = QVBoxLayout()
         info.setSpacing(6)
@@ -336,7 +336,7 @@ class GamesPage(QWidget):
         for index, profile in enumerate(GAMES):
             tile = _GameTile(profile)
             tile.clicked.connect(lambda idx=index: self._stack.setCurrentIndex(idx + 1))
-            grid.addWidget(tile, index // 2, index % 2, Qt.AlignCenter)
+            grid.addWidget(tile, index // 3, index % 3, Qt.AlignCenter)
         row.addLayout(grid)
         row.addStretch(1)
         outer.addLayout(row)
