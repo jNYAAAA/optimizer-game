@@ -120,6 +120,11 @@ _TEMPLATE = """
         color: {TEXT};
         padding: 18px 16px 8px 18px;
     }}
+    QLabel#SidebarFooter {{
+        color: {TEXT_FAINT};
+        font-size: 11px;
+        padding: 10px 8px 12px 8px;
+    }}
     QLabel#PageTitle {{
         font-size: 22px;
         font-weight: 600;
@@ -254,6 +259,18 @@ _TEMPLATE = """
     QPushButton#Segment:checked:hover {{
         background: {ACCENT_DIM};
         border-color: {ACCENT_DIM};
+        color: {ON_ACCENT};
+    }}
+    QPushButton#Back {{
+        color: {ACCENT};
+        border: 1px solid {ACCENT};
+        border-radius: 5px;
+        padding: 8px 18px;
+        font-weight: 600;
+    }}
+    QPushButton#Back:hover {{
+        background: {ACCENT};
+        border-color: {ACCENT};
         color: {ON_ACCENT};
     }}
 

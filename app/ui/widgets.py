@@ -4,7 +4,7 @@ from __future__ import annotations
 from datetime import datetime
 
 from PySide6.QtCore import QRectF, Qt
-from PySide6.QtGui import QColor, QPainter, QPainterPath, QPen
+from PySide6.QtGui import QColor, QIcon, QPainter, QPainterPath, QPen, QPixmap
 from PySide6.QtWidgets import (
     QAbstractButton,
     QFrame,
@@ -165,6 +165,69 @@ class ThemeToggleButton(QAbstractButton):
         painter.setBrush(color)
         painter.drawPath(crescent)
         painter.end()
+
+
+def nav_icon(kind: str, color: str, size: int = 22) -> QIcon:
+    """Рисует простую иконку для бокового меню в цвете темы."""
+    pixmap = QPixmap(size, size)
+    pixmap.fill(Qt.transparent)
+    painter = QPainter(pixmap)
+    painter.setRenderHint(QPainter.Antialiasing, True)
+    pen = QPen(QColor(color), 1.7)
+    pen.setCapStyle(Qt.RoundCap)
+    pen.setJoinStyle(Qt.RoundJoin)
+    painter.setPen(pen)
+    painter.setBrush(Qt.NoBrush)
+    s = float(size)
+
+    def line(x1: float, y1: float, x2: float, y2: float) -> None:
+        painter.drawLine(int(round(x1)), int(round(y1)), int(round(x2)), int(round(y2)))
+
+    if kind == "info":
+        painter.drawRoundedRect(QRectF(2.5, 4, s - 5, s - 10), 2, 2)
+        line(s / 2, s - 6, s / 2, s - 3)
+        line(s / 2 - 3, s - 3, s / 2 + 3, s - 3)
+    elif kind == "driver":
+        painter.drawRoundedRect(QRectF(s * 0.28, s * 0.28, s * 0.44, s * 0.44), 2, 2)
+        painter.drawRoundedRect(QRectF(s * 0.42, s * 0.42, s * 0.16, s * 0.16), 1, 1)
+        for i in range(3):
+            x = s * 0.36 + i * s * 0.14
+            line(x, s * 0.16, x, s * 0.28)
+            line(x, s * 0.72, x, s * 0.84)
+            y = s * 0.36 + i * s * 0.14
+            line(s * 0.16, y, s * 0.28, y)
+            line(s * 0.72, y, s * 0.84, y)
+    elif kind == "speed":
+        painter.drawArc(QRectF(3, 5, s - 6, s - 6), 0, 180 * 16)
+        line(s / 2, s / 2, s * 0.70, s * 0.32)
+        painter.setBrush(QColor(color))
+        painter.drawEllipse(QRectF(s / 2 - 1.6, s / 2 - 1.6, 3.2, 3.2))
+    elif kind == "games":
+        painter.drawRoundedRect(QRectF(3, s * 0.34, s - 6, s * 0.34), 5, 5)
+        painter.drawEllipse(QRectF(s * 0.22, s * 0.42, 4, 4))
+        painter.drawEllipse(QRectF(s * 0.62, s * 0.42, 4, 4))
+        line(s * 0.5 - 3, s * 0.5, s * 0.5 + 3, s * 0.5)
+        line(s * 0.5, s * 0.5 - 3, s * 0.5, s * 0.5 + 3)
+    elif kind == "tweaks":
+        for i, offset in enumerate((0.30, 0.55, 0.75)):
+            y = s * (0.3 + i * 0.2)
+            line(s * 0.18, y, s * 0.82, y)
+            painter.setBrush(QColor(color))
+            painter.drawEllipse(QRectF(s * offset - 2, y - 2, 4, 4))
+            painter.setBrush(Qt.NoBrush)
+    elif kind == "settings":
+        painter.drawEllipse(QRectF(s * 0.30, s * 0.30, s * 0.40, s * 0.40))
+        import math
+
+        for i in range(8):
+            angle = math.radians(i * 45)
+            x1 = s / 2 + math.cos(angle) * s * 0.30
+            y1 = s / 2 + math.sin(angle) * s * 0.30
+            x2 = s / 2 + math.cos(angle) * s * 0.42
+            y2 = s / 2 + math.sin(angle) * s * 0.42
+            line(x1, y1, x2, y2)
+    painter.end()
+    return QIcon(pixmap)
 
 
 def scrollable(widget: QWidget) -> QScrollArea:

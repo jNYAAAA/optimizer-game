@@ -25,6 +25,74 @@ BACKUP_DIRNAME = "game_backup"
 
 _ON_OFF = [("0", "Выкл"), ("1", "Вкл")]
 
+_GTAV_TEMPLATE = """<?xml version="1.0" encoding="UTF-8"?>
+<Settings>
+  <version value="27" />
+  <configSource>SMC_AUTO</configSource>
+  <graphics>
+    <Tessellation value="0" />
+    <LodScale value="0.000000" />
+    <PedLodBias value="0.200000" />
+    <VehicleLodBias value="0.000000" />
+    <ShadowQuality value="0" />
+    <ReflectionQuality value="0" />
+    <ReflectionMSAA value="0" />
+    <SSAO value="0" />
+    <AnisotropicFiltering value="0" />
+    <MSAA value="0" />
+    <MSAAFragments value="0" />
+    <MSAAQuality value="0" />
+    <SamplingMode value="0" />
+    <TextureQuality value="0" />
+    <ParticleQuality value="0" />
+    <WaterQuality value="0" />
+    <GrassQuality value="0" />
+    <ShaderQuality value="0" />
+    <Shadow_SoftShadows value="0" />
+    <UltraShadows_Enabled value="false" />
+    <Shadow_ParticleShadows value="true" />
+    <Shadow_Distance value="1.000000" />
+    <Shadow_LongShadows value="false" />
+    <Shadow_SplitZStart value="0.930000" />
+    <Shadow_SplitZEnd value="0.890000" />
+    <Shadow_aircraftExpWeight value="0.990000" />
+    <Shadow_DisableScreenSizeEffect value="false" />
+    <Grass_UpdateRadius value="0.000000" />
+    <Grass_UpdateBias value="0.000000" />
+    <Grass_Unk value="0.000000" />
+    <Grass_Unk2 value="0.000000" />
+    <Grass_Unk3 value="0.000000" />
+    <Grass_Unk4 value="0.000000" />
+    <Grass_Unk5 value="0.000000" />
+    <Grass_Unk6 value="0.000000" />
+    <Grass_Unk7 value="0.000000" />
+    <Grass_Unk8 value="0.000000" />
+    <Grass_Unk9 value="0.000000" />
+    <Grass_Unk10 value="0.000000" />
+    <DoF value="false" />
+    <DoF_Unk value="false" />
+    <HDStreamingInFlight value="false" />
+    <MaxLODScale value="0.000000" />
+    <MotionBlurStrength value="0.000000" />
+  </graphics>
+  <video>
+    <AdapterIndex value="0" />
+    <OutputIndex value="0" />
+    <ScreenWidth value="1920" />
+    <ScreenHeight value="1080" />
+    <RefreshRate value="60" />
+    <Windowed value="0" />
+    <VSync value="0" />
+    <Stereo value="0" />
+    <Convergence value="0.100000" />
+    <Separation value="0.000000" />
+    <PauseOnFocusLoss value="1" />
+    <AspectRatio value="0" />
+    <DX_Version value="2" />
+  </video>
+</Settings>
+"""
+
 
 @dataclass
 class Setting:
@@ -41,9 +109,11 @@ class GameProfile:
     key: str
     name: str
     logo: str
-    kind: str  # "vdf" | "ini"
+    kind: str  # "vdf" | "ini" | "xml" | "cfg"
     settings: list[Setting]
     locator: str
+    create: bool = False
+    template: str = ""
 
     @property
     def process(self) -> str:
@@ -412,6 +482,8 @@ GAMES: list[GameProfile] = [
         logo="games/gtav-cover.png",
         kind="xml",
         locator="gtav",
+        create=True,
+        template=_GTAV_TEMPLATE,
         settings=[
             Setting(
                 "TextureQuality", "2", "Качество текстур",
@@ -594,6 +666,8 @@ def _locate(profile: GameProfile) -> list[Path]:
             Path(os.environ.get("USERPROFILE", ""))
             / "Documents" / "Rockstar Games" / "GTA V" / "settings.xml"
         )
+        if profile.create:
+            return [candidate]
         return [candidate] if candidate.is_file() else []
     return []
 
@@ -729,6 +803,14 @@ def apply_setting_values(
     for index, path in enumerate(files):
         if progress:
             progress(int(index / total * 100), f"Применение: {profile.name}…")
+        if not path.exists():
+            if not profile.create:
+                continue
+            try:
+                path.parent.mkdir(parents=True, exist_ok=True)
+                path.write_text(profile.template, encoding="utf-8")
+            except OSError:
+                continue
         try:
             text = path.read_text(encoding="utf-8", errors="replace")
         except OSError:

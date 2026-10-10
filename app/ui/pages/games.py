@@ -1,6 +1,8 @@
 """Оптимизация игр: сетка игр и экран настроек с выбором значений и откатом."""
 from __future__ import annotations
 
+from pathlib import Path
+
 from PySide6.QtCore import Qt, QThreadPool, Signal
 from PySide6.QtGui import QPixmap
 from PySide6.QtWidgets import (
@@ -32,7 +34,7 @@ from ...utils import resource_path
 from .. import theme
 from ..widgets import Card, LogView, make_header
 
-COVER_W, COVER_H = 190, 285
+COVER_W, COVER_H = 155, 232
 
 
 def _cover_pixmap(profile: GameProfile, width: int, height: int) -> QPixmap:
@@ -49,7 +51,7 @@ class _GameTile(QFrame):
         super().__init__(parent)
         self.setObjectName("Card")
         self.setCursor(Qt.PointingHandCursor)
-        self.setFixedSize(250, 390)
+        self.setFixedSize(205, 320)
 
         layout = QVBoxLayout(self)
         layout.setContentsMargins(16, 16, 16, 14)
@@ -148,7 +150,9 @@ class _GamePanel(QWidget):
         root.setSpacing(12)
 
         top = QHBoxLayout()
-        back = QPushButton("НАЗАД")
+        back = QPushButton("←  НАЗАД")
+        back.setObjectName("Back")
+        back.setCursor(Qt.PointingHandCursor)
         back.clicked.connect(self.back_requested.emit)
         top.addWidget(back)
         top.addStretch(1)
@@ -230,6 +234,7 @@ class _GamePanel(QWidget):
         self.progress.setRange(0, 100)
         self.progress.setValue(100)
         running = self.profile.key in running_game_keys()
+        existing = [f for f in files if Path(f).is_file()]
         if not files:
             self.status.setText(f"Файлы настроек {self.profile.name} не найдены.")
             self.status.setStyleSheet(f"color: {theme.palette()['TEXT_DIM']};")
@@ -238,8 +243,14 @@ class _GamePanel(QWidget):
             return
         self.apply_btn.setEnabled(True)
         self.restore_btn.setEnabled(True)
+        if not existing:
+            self.status.setText(
+                f"{self.profile.name} не запускалась — файл настроек будет создан при применении."
+            )
+            self.status.setStyleSheet(f"color: {theme.palette()['TEXT_DIM']};")
+            return
         note = f"{self.profile.name} запущена — закройте игру." if running else ""
-        self.status.setText(f"Найдено профилей: {len(files)}. {note}".strip())
+        self.status.setText(f"Найдено профилей: {len(existing)}. {note}".strip())
         self.status.setStyleSheet(
             f"color: {theme.palette()['WARN'] if running else theme.palette()['TEXT_DIM']};"
         )
@@ -336,7 +347,7 @@ class GamesPage(QWidget):
         for index, profile in enumerate(GAMES):
             tile = _GameTile(profile)
             tile.clicked.connect(lambda idx=index: self._stack.setCurrentIndex(idx + 1))
-            grid.addWidget(tile, index // 3, index % 3, Qt.AlignCenter)
+            grid.addWidget(tile, index // 4, index % 4, Qt.AlignCenter)
         row.addLayout(grid)
         row.addStretch(1)
         outer.addLayout(row)

@@ -5,7 +5,7 @@ import math
 import os
 import sys
 
-from PySide6.QtCore import QTimer
+from PySide6.QtCore import QSize, Qt, QTimer
 from PySide6.QtGui import QIcon
 from PySide6.QtWidgets import (
     QApplication,
@@ -35,7 +35,7 @@ from .pages.optimize import OptimizePage
 from .pages.settings import SettingsPage
 from .pages.tweaks import TweaksPage
 from .splash import SplashScreen
-from .widgets import ThemeToggleButton, scrollable
+from .widgets import ThemeToggleButton, nav_icon, scrollable
 
 
 class MainWindow(QMainWindow):
@@ -65,7 +65,13 @@ class MainWindow(QMainWindow):
 
         self.nav = QListWidget()
         self.nav.setObjectName("Nav")
+        self.nav.setIconSize(QSize(22, 22))
         side_layout.addWidget(self.nav, 1)
+
+        footer = QLabel(f"версия {APP_VERSION}")
+        footer.setObjectName("SidebarFooter")
+        footer.setAlignment(Qt.AlignCenter)
+        side_layout.addWidget(footer)
         layout.addWidget(sidebar)
 
         # Область содержимого: верхняя панель с переключателем темы + страницы
@@ -97,6 +103,7 @@ class MainWindow(QMainWindow):
             ("Твики", TweaksPage(), False),
             ("Настройки", SettingsPage(), True),
         ]
+        self._nav_kinds = ["info", "driver", "speed", "games", "tweaks", "settings"]
         self.pages: list[tuple[str, QWidget]] = []
         for name, page, use_scroll in definitions:
             container = scrollable(page) if use_scroll else page
@@ -105,11 +112,22 @@ class MainWindow(QMainWindow):
             self.pages.append((name, page))
 
         self.nav.currentRowChanged.connect(self.stack.setCurrentIndex)
+        self.nav.currentRowChanged.connect(self._update_nav_icons)
         self.nav.setCurrentRow(0)
 
         self._update_theme_button()
+        self._update_nav_icons()
 
     # ------------------------------------------------------------------
+    def _update_nav_icons(self) -> None:
+        current = self.nav.currentRow()
+        palette = theme.palette()
+        for index in range(self.nav.count()):
+            item = self.nav.item(index)
+            kind = self._nav_kinds[index] if index < len(self._nav_kinds) else "info"
+            color = palette["ACCENT"] if index == current else palette["TEXT_DIM"]
+            item.setIcon(nav_icon(kind, color))
+
     def _update_theme_button(self) -> None:
         if theme.current() == "dark":
             self.theme_btn.setToolTip("Включить светлую тему")
@@ -128,6 +146,7 @@ class MainWindow(QMainWindow):
             hook = getattr(page, "on_theme_changed", None)
             if callable(hook):
                 hook()
+        self._update_nav_icons()
         settings = load_settings()
         settings["theme"] = new_mode
         save_settings(settings)
