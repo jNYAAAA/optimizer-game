@@ -147,6 +147,14 @@ _TEMPLATE = """
         background: {ACCENT};
         border: none;
     }}
+    QFrame#OptionRow {{
+        background: {BG_ALT};
+        border: 1px solid {BORDER};
+        border-radius: 6px;
+    }}
+    QFrame#OptionRow:hover {{
+        border-color: {ACCENT};
+    }}
 
     QListWidget#Nav {{
         background: transparent;

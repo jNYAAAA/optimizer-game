@@ -193,8 +193,8 @@ class InfoIcon(QLabel):
         super().leaveEvent(event)
 
 
-class OptionRow(QWidget):
-    """Строка настройки: значок «i», название, список значений и «Применить»."""
+class OptionRow(QFrame):
+    """Строка настройки в рамке: значок «i», название, список значений и «Применить»."""
 
     apply_requested = Signal(str)
     help_hovered = Signal(str)
@@ -209,9 +209,10 @@ class OptionRow(QWidget):
         parent: QWidget | None = None,
     ) -> None:
         super().__init__(parent)
+        self.setObjectName("OptionRow")
         layout = QHBoxLayout(self)
-        layout.setContentsMargins(0, 3, 0, 3)
-        layout.setSpacing(8)
+        layout.setContentsMargins(12, 8, 12, 8)
+        layout.setSpacing(10)
 
         self.info = InfoIcon(help_text or label)
         self.info.hovered.connect(self.help_hovered.emit)

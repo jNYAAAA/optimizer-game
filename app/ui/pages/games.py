@@ -81,17 +81,18 @@ class _GameTile(QFrame):
         super().mousePressEvent(event)
 
 
-class _SettingRow(QWidget):
+class _SettingRow(QFrame):
     apply_requested = Signal(object, str)
     help_hovered = Signal(str)
 
     def __init__(self, setting: Setting, parent: QWidget | None = None) -> None:
         super().__init__(parent)
         self.setting = setting
+        self.setObjectName("OptionRow")
 
         layout = QHBoxLayout(self)
-        layout.setContentsMargins(0, 3, 0, 3)
-        layout.setSpacing(8)
+        layout.setContentsMargins(12, 8, 12, 8)
+        layout.setSpacing(10)
 
         self.info = InfoIcon(setting.help or setting.label)
         self.info.hovered.connect(self.help_hovered.emit)

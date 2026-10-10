@@ -96,9 +96,9 @@ NVIDIA_PROFILES: dict[str, list[NvidiaSetting]] = {
     "dota2": _settings({**_COMMON, "low_latency": "on", "power": "max", "tex_quality": "highperf", "max_fps": "off"}),
     "apex": _settings({**_COMMON, "low_latency": "ultra", "power": "max", "tex_quality": "highperf", "max_fps": "off"}),
     "pubg": _settings({**_COMMON, "low_latency": "on", "power": "max", "tex_quality": "highperf", "max_fps": "off"}),
-    "squad": _settings({**_COMMON, "low_latency": "on", "power": "max", "tex_quality": "quality", "max_fps": "141"}),
-    "dayz": _settings({**_COMMON, "low_latency": "on", "power": "max", "tex_quality": "quality", "max_fps": "off"}),
-    "gtav": _settings({**_COMMON, "low_latency": "on", "power": "max", "tex_quality": "highquality", "max_fps": "off"}),
+    "squad": _settings({**_COMMON, "low_latency": "on", "power": "max", "tex_quality": "highperf", "max_fps": "141"}),
+    "dayz": _settings({**_COMMON, "low_latency": "on", "power": "max", "tex_quality": "highperf", "max_fps": "off"}),
+    "gtav": _settings({**_COMMON, "low_latency": "on", "power": "max", "tex_quality": "highperf", "max_fps": "off"}),
 }
 
 
