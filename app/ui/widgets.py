@@ -9,6 +9,7 @@ from PySide6.QtGui import (
     QColor,
     QCursor,
     QIcon,
+    QLinearGradient,
     QPainter,
     QPainterPath,
     QPen,
@@ -124,56 +125,45 @@ class Card(QFrame):
 
 
 class Backdrop(QWidget):
-    """Фон приложения: базовый цвет и лёгкий киберпанк-узор (сетка и свечение)."""
+    """Фон приложения: мягкий градиент со свечениями и лёгкой точечной текстурой."""
 
     def paintEvent(self, event) -> None:  # noqa: N802 - Qt API
         colors = theme.palette()
         painter = QPainter(self)
         rect = self.rect()
-        painter.fillRect(rect, QColor(colors["BG"]))
 
-        # Мягкое свечение акцентом в правом верхнем углу.
-        glow = QRadialGradient(
-            rect.width() * 0.85, -rect.height() * 0.15, max(rect.width(), rect.height()) * 0.9
-        )
-        inner = QColor(colors["ACCENT"])
-        inner.setAlpha(30)
-        outer = QColor(colors["ACCENT"])
-        outer.setAlpha(0)
-        glow.setColorAt(0.0, inner)
-        glow.setColorAt(1.0, outer)
-        painter.fillRect(rect, QBrush(glow))
+        base = QColor(colors["BG"])
+        end = base.lighter(118) if theme.is_dark() else base.darker(104)
+        gradient = QLinearGradient(rect.topLeft(), rect.bottomRight())
+        gradient.setColorAt(0.0, base)
+        gradient.setColorAt(1.0, end)
+        painter.fillRect(rect, QBrush(gradient))
 
-        # Сетка: тонкие линии и акцентная линия каждые четыре клетки.
-        step = 34
-        line = QColor(colors["BORDER"])
-        line.setAlpha(70)
-        accent = QColor(colors["ACCENT"])
-        accent.setAlpha(36)
-        painter.setPen(QPen(line, 1))
-        for x in range(0, rect.width() + 1, step):
-            if (x // step) % 4 == 0:
-                continue
-            painter.drawLine(x, 0, x, rect.height())
-        for y in range(0, rect.height() + 1, step):
-            if (y // step) % 4 == 0:
-                continue
-            painter.drawLine(0, y, rect.width(), y)
-        painter.setPen(QPen(accent, 1))
-        for x in range(0, rect.width() + 1, step * 4):
-            painter.drawLine(x, 0, x, rect.height())
-        for y in range(0, rect.height() + 1, step * 4):
-            painter.drawLine(0, y, rect.width(), y)
+        self._glow(painter, rect, colors["ACCENT"], 0.90, -0.05, 1.0, 40)
+        self._glow(painter, rect, colors["MAGENTA"], 0.05, 1.05, 0.9, 22)
 
-        # Редкие «узлы» на пересечениях — как на печатной плате.
-        node = QColor(colors["ACCENT"])
-        node.setAlpha(60)
-        painter.setPen(Qt.NoPen)
-        painter.setBrush(node)
-        for x in range(0, rect.width() + 1, step * 4):
-            for y in range(0, rect.height() + 1, step * 4):
-                painter.drawRect(x - 1, y - 1, 3, 3)
+        dot = QColor(colors["TEXT_FAINT"])
+        dot.setAlpha(45)
+        painter.setPen(QPen(dot, 2))
+        for x in range(0, rect.width() + 1, 26):
+            for y in range(0, rect.height() + 1, 26):
+                painter.drawPoint(x, y)
         painter.end()
+
+    @staticmethod
+    def _glow(painter: QPainter, rect, color: str, fx: float, fy: float, fr: float, alpha: int) -> None:
+        inner = QColor(color)
+        inner.setAlpha(alpha)
+        outer = QColor(color)
+        outer.setAlpha(0)
+        gradient = QRadialGradient(
+            rect.width() * fx,
+            rect.height() * fy,
+            max(rect.width(), rect.height()) * fr,
+        )
+        gradient.setColorAt(0.0, inner)
+        gradient.setColorAt(1.0, outer)
+        painter.fillRect(rect, QBrush(gradient))
 
 
 class LogView(QPlainTextEdit):
