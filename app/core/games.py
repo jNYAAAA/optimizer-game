@@ -144,14 +144,20 @@ GAMES: list[GameProfile] = [
                 options=[("0", "Выкл"), ("1", "Вкл"), ("2", "Адаптивная")],
             ),
             Setting(
-                "setting.msaa_samples", "4", "Режим сглаживания (MSAA)",
-                help="Сглаживание краёв геометрии. 4x — компромисс между качеством и FPS.",
-                options=[("0", "Выкл"), ("2", "2x"), ("4", "4x"), ("8", "8x")],
+                "setting.msaa_samples", "4", "Режим сглаживания множественной выборкой",
+                help="Сглаживание краёв геометрии. 4X MSAA — компромисс между качеством и FPS.",
+                options=[("0", "CMAA2"), ("2", "2X MSAA"), ("4", "4X MSAA"), ("8", "8X MSAA")],
             ),
             Setting(
-                "setting.videocfg_shadow_quality", "1", "Тени",
+                "setting.videocfg_shadow_quality", "0", "Общее качество теней",
                 help="Качество теней. Низкое даёт заметный прирост FPS; тени остаются читаемыми.",
-                options=[("1", "Низкое"), ("2", "Среднее"), ("3", "Высокое")],
+                options=[("0", "Низкое"), ("1", "Среднее"), ("2", "Высокое")],
+            ),
+            Setting(
+                "setting.videocfg_dynamic_shadows", "1", "Динамические тени",
+                help="Тени от движущихся объектов. «От всего» — со всех объектов, «Только солнце» — "
+                "лишь от солнца (быстрее).",
+                options=[("1", "От всего"), ("0", "Только солнце")],
             ),
             Setting(
                 "setting.videocfg_texture_detail", "0", "Детализация моделей и текстур",
@@ -159,14 +165,26 @@ GAMES: list[GameProfile] = [
                 options=[("0", "Низкое"), ("1", "Среднее"), ("2", "Высокое")],
             ),
             Setting(
+                "setting.r_texturefilteringquality", "5", "Режим фильтрации текстур",
+                help="Чёткость текстур под углом. Анизотропная фильтрация почти не стоит FPS.",
+                options=[
+                    ("0", "Билинейная"),
+                    ("1", "Трилинейная"),
+                    ("2", "Анизотропная 2x"),
+                    ("3", "Анизотропная 4x"),
+                    ("4", "Анизотропная 8x"),
+                    ("5", "Анизотропная 16x"),
+                ],
+            ),
+            Setting(
                 "setting.shaderquality", "0", "Детализация шейдеров",
                 help="Сложность шейдеров, отражений и воды.",
                 options=[("0", "Низкое"), ("1", "Среднее"), ("2", "Высокое")],
             ),
             Setting(
-                "setting.videocfg_particle_detail", "1", "Детализация частиц",
+                "setting.videocfg_particle_detail", "0", "Детализация частиц",
                 help="Плотность частиц: дым, огонь, взрывы.",
-                options=[("1", "Низкое"), ("2", "Среднее"), ("3", "Высокое")],
+                options=[("0", "Низкая"), ("1", "Средняя"), ("2", "Высокая")],
             ),
             Setting(
                 "setting.videocfg_ao_detail", "0", "Глобальное затенение",
@@ -174,19 +192,34 @@ GAMES: list[GameProfile] = [
                 options=[("0", "Выкл"), ("1", "Низкое"), ("2", "Среднее"), ("3", "Высокое")],
             ),
             Setting(
-                "setting.videocfg_hdr_detail", "0", "HDR",
+                "setting.videocfg_hdr_detail", "0", "Расширенный динамический диапазон",
                 help="Диапазон освещения. «Производительность» снижает нагрузку.",
                 options=[("0", "Производительность"), ("1", "Качество")],
             ),
             Setting(
                 "setting.videocfg_fsr_detail", "0", "FidelityFX Super Resolution",
                 help="Апскейл из низкого разрешения: повышает FPS, но добавляет размытие.",
-                options=[("0", "Выкл"), ("1", "Вкл")],
+                options=[("0", "Выкл. (наивысшее качество)"), ("1", "Вкл. (производительность)")],
             ),
             Setting(
                 "setting.r_low_latency", "0", "NVIDIA Reflex",
                 help="Снижает задержку ввода. «Boost» не даёт GPU сбрасывать частоты.",
                 options=[("0", "Выкл"), ("1", "Вкл"), ("2", "Вкл + Boost")],
+            ),
+            Setting(
+                "setting.fullscreen", "1", "Полноэкранный режим",
+                help="Полноэкранный режим обычно даёт минимальную задержку ввода.",
+                options=[("1", "Полноэкранный"), ("0", "Оконный")],
+            ),
+            Setting(
+                "setting.nowindowborder", "0", "Окно без рамки",
+                help="При оконном режиме убирает рамку окна (безрамочное окно).",
+                options=[("0", "Выкл"), ("1", "Вкл")],
+            ),
+            Setting(
+                "setting.fullscreen_min_on_focus_loss", "1", "Сворачивать при потере фокуса",
+                help="Сворачивать игру при переключении в другое окно.",
+                options=[("1", "Вкл"), ("0", "Выкл")],
             ),
         ],
     ),
@@ -582,10 +615,11 @@ GAME_PRESETS: list[tuple[str, str]] = [
 _PRESET_OVERRIDES: dict[str, dict[str, tuple[str, str]]] = {
     "cs2": {
         "setting.msaa_samples": ("2", "8"),
-        "setting.videocfg_shadow_quality": ("2", "3"),
+        "setting.videocfg_shadow_quality": ("1", "2"),
         "setting.videocfg_texture_detail": ("1", "2"),
+        "setting.r_texturefilteringquality": ("3", "5"),
         "setting.shaderquality": ("1", "2"),
-        "setting.videocfg_particle_detail": ("2", "3"),
+        "setting.videocfg_particle_detail": ("1", "2"),
         "setting.videocfg_ao_detail": ("1", "3"),
         "setting.videocfg_hdr_detail": ("", "1"),
     },
