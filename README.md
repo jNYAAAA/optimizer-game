@@ -152,3 +152,16 @@ pyinstaller --noconfirm --clean OptimizerGame.spec
 
 При запуске показывается анимированный экран загрузки, а иконка `assets/icon.ico`
 используется для окна и самого `.exe`.
+
+## Сборка установщика (Inno Setup)
+
+Один скрипт собирает и `.exe`, и установщик в стиле приложения:
+
+```powershell
+build-installer.bat
+```
+
+Требуется [Inno Setup](https://jrsoftware.org/isinfo.php): `winget install JRSoftware.InnoSetup`.
+
+Результат — `dist_installer\OptimizerGame-Setup.exe` (~54 МБ): мастер установки
+с баннером в стиле приложения, русский/английский язык, ярлыки, деинсталлятор.

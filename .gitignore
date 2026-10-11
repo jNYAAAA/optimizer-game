@@ -11,6 +11,7 @@ env/
 # Packaging / build
 build/
 dist/
+dist_installer/
 *.egg-info/
 
 # IDE
