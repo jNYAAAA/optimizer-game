@@ -567,6 +567,102 @@ GAMES: list[GameProfile] = [
 GAMES_BY_KEY = {game.key: game for game in GAMES}
 
 
+# ---------------------------------------------------------------------------
+# Пресеты настроек самой игры (аналог профилей в панели NVIDIA)
+# ---------------------------------------------------------------------------
+GAME_PRESETS: list[tuple[str, str]] = [
+    ("perf", "МАКС. ПРОИЗВОДИТЕЛЬНОСТЬ"),
+    ("balanced", "БАЛАНС"),
+    ("quality", "КАЧЕСТВО"),
+]
+
+# Значения пресетов «БАЛАНС» и «КАЧЕСТВО» изменить относительно рекомендованных.
+# Формат: game_key -> setting_key -> (значение_баланса, значение_качества).
+# Пустая строка — оставить рекомендованное значение.
+_PRESET_OVERRIDES: dict[str, dict[str, tuple[str, str]]] = {
+    "cs2": {
+        "setting.msaa_samples": ("2", "8"),
+        "setting.videocfg_shadow_quality": ("2", "3"),
+        "setting.videocfg_texture_detail": ("1", "2"),
+        "setting.shaderquality": ("1", "2"),
+        "setting.videocfg_particle_detail": ("2", "3"),
+        "setting.videocfg_ao_detail": ("1", "3"),
+        "setting.videocfg_hdr_detail": ("", "1"),
+    },
+    "dota2": {
+        "setting.r_ssao": ("", "1"),
+        "setting.r_deferred_height_fog": ("", "1"),
+        "setting.cl_globallight_shadow_mode": ("1", "2"),
+        "setting.r_deferred_additive_pass": ("", "1"),
+        "setting.r_deferred_specular_bloom": ("", "1"),
+        "setting.dota_portrait_animate": ("", "1"),
+        "setting.dota_cheap_water": ("", "0"),
+        "setting.r_shadow_half_update_rate": ("", "0"),
+    },
+    "apex": {
+        "setting.volumetric_lighting": ("", "1"),
+        "setting.volumetric_fog": ("", "1"),
+        "setting.cl_ragdoll_maxcount": ("2", "4"),
+        "setting.cl_particle_fallback_base": ("1", "2"),
+        "setting.mat_forceaniso": ("", "16"),
+        "setting.stream_memory": ("", "4000000"),
+    },
+    "pubg": {
+        "sg.ViewDistanceQuality": ("", "3"),
+        "sg.AntiAliasingQuality": ("2", "3"),
+        "sg.ShadowQuality": ("2", "3"),
+        "sg.PostProcessQuality": ("2", "3"),
+        "sg.TextureQuality": ("", "3"),
+        "sg.EffectsQuality": ("2", "3"),
+        "sg.FoliageQuality": ("2", "3"),
+    },
+    "squad": {
+        "AmbientOcclusion": ("", "(Value=1)"),
+        "sg.ViewDistanceQuality": ("", "3"),
+        "sg.AntiAliasingQuality": ("", "3"),
+        "sg.ShadowQuality": ("2", "3"),
+        "sg.ReflectionQuality": ("2", "3"),
+        "sg.TextureQuality": ("", "3"),
+        "sg.PostProcessQuality": ("2", "3"),
+        "sg.FoliageQuality": ("2", "3"),
+    },
+    "dayz": {
+        "MSAA": ("2", "4"),
+        "PostFX": ("1", "2"),
+        "FXAO": ("", "1"),
+        "AToC": ("", "1"),
+        "AnisoFilter": ("2", "3"),
+        "TerrainDetail": ("1", "2"),
+        "FXAA": ("", "1"),
+    },
+    "gtav": {
+        "ShaderQuality": ("", "2"),
+        "ShadowQuality": ("", "2"),
+        "ReflectionQuality": ("1", "2"),
+        "ReflectionMSAA": ("1", "3"),
+        "SSAO": ("", "2"),
+        "AnisotropicFiltering": ("", "4"),
+        "MSAA": ("1", "2"),
+        "ParticleQuality": ("1", "2"),
+        "WaterQuality": ("", "2"),
+        "GrassQuality": ("", "3"),
+        "Tessellation": ("2", "3"),
+    },
+}
+
+
+def preset_value(game_key: str, setting: Setting, preset: str) -> str:
+    """Значение настройки для выбранного пресета игры."""
+    override = _PRESET_OVERRIDES.get(game_key, {}).get(setting.key)
+    if override is not None:
+        balanced, quality = override
+        if preset == "balanced" and balanced:
+            return balanced
+        if preset == "quality" and quality:
+            return quality
+    return setting.value
+
+
 @dataclass
 class GameSettingsResult:
     ok: bool

@@ -20,12 +20,14 @@ from PySide6.QtWidgets import (
 )
 
 from ...core.games import (
+    GAME_PRESETS,
     GAMES,
     GameProfile,
     GameSettingsResult,
     Setting,
     apply_setting_values,
     find_game_files,
+    preset_value,
     restore_game_settings,
     running_game_keys,
 )
@@ -122,6 +124,11 @@ class _SettingRow(QFrame):
     def value(self) -> str:
         return self.combo.currentData()
 
+    def set_value(self, value: str) -> None:
+        index = self.combo.findData(value)
+        if index >= 0:
+            self.combo.setCurrentIndex(index)
+
 
 class _GameSettingsSection(QWidget):
     """Настройки самой игры (файл конфигурации)."""
@@ -138,6 +145,24 @@ class _GameSettingsSection(QWidget):
         self.help_label.setObjectName("PageHint")
         self.help_label.setWordWrap(True)
         root.addWidget(self.help_label)
+
+        preset_row = QHBoxLayout()
+        preset_row.setSpacing(8)
+        preset_label = QLabel("Профиль:")
+        preset_label.setObjectName("Caption")
+        preset_row.addWidget(preset_label)
+        self._preset_buttons: list[QPushButton] = []
+        for key, label in GAME_PRESETS:
+            button = QPushButton(label)
+            button.setObjectName("Segment")
+            button.setCheckable(True)
+            button.setCursor(Qt.PointingHandCursor)
+            button.clicked.connect(lambda _checked=False, k=key: self._apply_preset(k))
+            preset_row.addWidget(button)
+            self._preset_buttons.append(button)
+        preset_row.addStretch(1)
+        root.addLayout(preset_row)
+        self._preset_buttons[0].setChecked(True)
 
         card = Card("Настройки")
         self._rows: list[_SettingRow] = []
@@ -186,6 +211,14 @@ class _GameSettingsSection(QWidget):
         self.help_label.setText(
             text or "Наведите на значок (i), чтобы узнать, за что отвечает настройка."
         )
+
+    def _apply_preset(self, key: str) -> None:
+        for row in self._rows:
+            row.set_value(preset_value(self.profile.key, row.setting, key))
+        for button, (preset_key, _label) in zip(self._preset_buttons, GAME_PRESETS):
+            button.setChecked(preset_key == key)
+        label = dict(GAME_PRESETS).get(key, key)
+        self.log.log(f"Выбран профиль «{label}». Нажмите «ПРИМЕНИТЬ ВСЁ», чтобы записать.")
 
     def refresh(self) -> None:
         self.progress.setRange(0, 0)
@@ -375,8 +408,9 @@ class GamesPage(QWidget):
         root.addWidget(
             make_header(
                 "Оптимизация игр",
-                "Выберите игру — приложение применит профиль настроек «максимум FPS без "
-                "потери качества». Для CS2 также есть под-разделы NVIDIA и Windows.",
+                "Выберите игру — у каждой есть под-разделы «Игра» (настройки игры с "
+                "пресетами «Макс. производительность / Баланс / Качество»), «NVIDIA» и "
+                "«Windows».",
             )
         )
 
