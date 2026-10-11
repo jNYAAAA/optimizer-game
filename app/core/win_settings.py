@@ -38,6 +38,7 @@ _GAME_EXE = {
     "squad": ["Squad/SquadGame/Binaries/Win64/SquadGame-Win64-Shipping.exe"],
     "dayz": ["DayZ/DayZ_x64.exe"],
     "gtav": ["Grand Theft Auto V/GTA5.exe"],
+    "wardogs": ["Wardogs/Wardogs/Binaries/Win64/WardogsClient-Win64-Shipping.exe"],
 }
 
 

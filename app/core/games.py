@@ -122,6 +122,7 @@ class GameProfile:
             "dota2": "dota2.exe",
             "apex": "r5apex.exe",
             "pubg": "tslgame.exe",
+            "wardogs": "wardogsclient-win64-shipping.exe",
         }.get(self.key, "")
 
 
@@ -594,6 +595,14 @@ GAMES: list[GameProfile] = [
                 options=[("0", "Выкл"), ("1", "Вкл")],
             ),
         ],
+    ),
+    GameProfile(
+        key="wardogs",
+        name="WARDOGS",
+        logo="games/wardogs-cover.png",
+        kind="ini",
+        locator="wardogs",
+        settings=[],
     ),
 ]
 

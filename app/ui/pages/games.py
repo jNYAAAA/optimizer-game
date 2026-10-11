@@ -146,7 +146,9 @@ class _GameSettingsSection(QWidget):
         self.help_label.setWordWrap(True)
         root.addWidget(self.help_label)
 
-        preset_row = QHBoxLayout()
+        preset_bar = QWidget()
+        preset_row = QHBoxLayout(preset_bar)
+        preset_row.setContentsMargins(0, 0, 0, 0)
         preset_row.setSpacing(8)
         preset_label = QLabel("Профиль:")
         preset_label.setObjectName("Caption")
@@ -161,8 +163,9 @@ class _GameSettingsSection(QWidget):
             preset_row.addWidget(button)
             self._preset_buttons.append(button)
         preset_row.addStretch(1)
-        root.addLayout(preset_row)
+        root.addWidget(preset_bar)
         self._preset_buttons[0].setChecked(True)
+        preset_bar.setVisible(bool(profile.settings))
 
         card = Card("Настройки")
         self._rows: list[_SettingRow] = []
@@ -172,6 +175,7 @@ class _GameSettingsSection(QWidget):
             row.help_hovered.connect(self._on_help)
             card.body.addWidget(row, card.body.rowCount(), 0, 1, 2)
             self._rows.append(row)
+        card.setVisible(bool(profile.settings))
         root.addWidget(card)
 
         controls = QHBoxLayout()
@@ -186,6 +190,8 @@ class _GameSettingsSection(QWidget):
         self.status = QLabel("Проверка файлов…")
         self.status.setObjectName("PageHint")
         self.status.setWordWrap(True)
+        if not profile.settings:
+            self.status.setText("Настройки для этой игры ещё не добавлены.")
         controls.addWidget(self.status, 1)
         root.addLayout(controls)
 
@@ -221,6 +227,13 @@ class _GameSettingsSection(QWidget):
         self.log.log(f"Выбран профиль «{label}». Нажмите «ПРИМЕНИТЬ ВСЁ», чтобы записать.")
 
     def refresh(self) -> None:
+        if not self.profile.settings:
+            self.apply_btn.setEnabled(False)
+            self.restore_btn.setEnabled(False)
+            self.progress.setRange(0, 100)
+            self.progress.setValue(0)
+            self.status.setText("Настройки для этой игры ещё не добавлены.")
+            return
         self.progress.setRange(0, 0)
         worker = Worker(find_game_files, self.profile)
         worker.signals.finished.connect(self._on_files)
