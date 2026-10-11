@@ -184,9 +184,6 @@ class TweaksPage(QWidget):
         self.status.setText(f"Применено твиков: {applied_count} из {len(visible)}")
 
     # ------------------------------------------------------------------
-    def on_theme_changed(self) -> None:
-        self._render()
-
     def showEvent(self, event) -> None:  # noqa: N802 - Qt API
         super().showEvent(event)
         if not self._loaded:

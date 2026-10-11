@@ -144,13 +144,6 @@ class DashboardPage(QWidget):
         self._sensors_timer.stop()
         super().hideEvent(event)
 
-    def on_theme_changed(self) -> None:
-        # Перерисовываем уже прочитанные датчики в новых цветах, не опрашивая их заново.
-        if self._sensor_readings:
-            self._render_sensors()
-        else:
-            self._refresh_sensors()
-
     def load(self) -> None:
         self.status.setText("Сбор данных о системе…")
         worker = Worker(collect_system_info, pass_progress=True)

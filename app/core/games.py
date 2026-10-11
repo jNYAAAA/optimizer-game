@@ -17,6 +17,7 @@ import json
 import os
 import re
 import shutil
+import stat
 from dataclasses import dataclass, field
 from pathlib import Path
 
@@ -128,6 +129,9 @@ class GameProfile:
     locator: str
     create: bool = False
     template: str = ""
+    # У игры есть вкладка «Убрать тени» (правка sg.ShadowQuality + защита файла
+    # от перезаписи игрой).
+    disable_shadows: bool = False
 
     @property
     def process(self) -> str:
@@ -616,6 +620,7 @@ GAMES: list[GameProfile] = [
         logo="games/wardogs-cover.png",
         kind="ini",
         locator="wardogs",
+        disable_shadows=True,
         settings=[
             # --- Группы масштабируемости (секция ScalabilityGroups) ---
             Setting(
@@ -633,19 +638,15 @@ GAMES: list[GameProfile] = [
                 options=list(_UE_QUALITY_MAX),
             ),
             Setting(
-                "sg.MeshQuality", "2", "Детализация моделей", "ScalabilityGroups",
-                help="Геометрия персонажей и мира. Среднее — читаемые силуэты без лишней нагрузки.",
+                "sg.MeshQuality", "1", "Детализация моделей", "ScalabilityGroups",
+                help="Геометрия персонажей и мира. Низкое — минимум нагрузки на ЦП/ГП; "
+                "среднее даёт более цельные силуэты.",
                 options=list(_UE_QUALITY_MAX),
             ),
             Setting(
-                "sg.ShadingQuality", "1", "Качество затенения", "ScalabilityGroups",
-                help="Сложность шейдинга. Низкое почти не влияет на картинку в бою.",
-                options=list(_UE_QUALITY_MAX),
-            ),
-            Setting(
-                "sg.ShadowQuality", "1", "Тени", "ScalabilityGroups",
-                help="Качество теней. Низкое/среднее даёт заметный прирост FPS; 4 — максимальный "
-                "уровень («Overkill»).",
+                "sg.ShadingQuality", "0", "Качество затенения", "ScalabilityGroups",
+                help="Сложность шейдинга. «Картошка» заметно снижает нагрузку и почти не "
+                "влияет на читаемость картинки в бою.",
                 options=list(_UE_QUALITY_MAX),
             ),
             Setting(
@@ -659,8 +660,9 @@ GAMES: list[GameProfile] = [
                 options=list(_UE_QUALITY_MAX),
             ),
             Setting(
-                "sg.PostProcessQuality", "1", "Постобработка", "ScalabilityGroups",
-                help="Эффекты постобработки. Низкое — компромисс между FPS и картинкой.",
+                "sg.PostProcessQuality", "0", "Постобработка", "ScalabilityGroups",
+                help="Эффекты постобработки. «Картошка» — максимум кадров, картинка становится "
+                "проще, но цели читаются.",
                 options=list(_UE_QUALITY_MAX),
             ),
             Setting(
@@ -689,28 +691,31 @@ GAMES: list[GameProfile] = [
                 options=list(_UE_QUALITY_MAX),
             ),
             Setting(
-                "sg.TextureQuality", "2", "Текстуры", "ScalabilityGroups",
-                help="Общее качество текстур. Влияет на VRAM сильнее, чем на FPS.",
+                "sg.TextureQuality", "1", "Потоковая передача текстур", "ScalabilityGroups",
+                help="Размер пула текстур в памяти (стриминг). Низкое — меньше видеопамяти и "
+                "поздних подгрузок; в видео выбрано «Низкое».",
                 options=list(_UE_QUALITY_MAX),
             ),
             Setting(
-                "sg.WorldTextureQuality", "2", "Текстуры мира", "ScalabilityGroups",
-                help="Качество текстур мира. При 8 ГБ VRAM и меньше ставьте низкое.",
+                "sg.WorldTextureQuality", "0", "Текстуры мира", "ScalabilityGroups",
+                help="Качество текстур мира. При 8 ГБ VRAM и меньше — низкое.",
                 options=list(_UE_QUALITY_MAX),
             ),
             Setting(
-                "sg.CharacterTextureQuality", "2", "Текстуры персонажей", "ScalabilityGroups",
-                help="Качество текстур персонажей — важно для их заметности.",
+                "sg.CharacterTextureQuality", "0", "Текстуры персонажей", "ScalabilityGroups",
+                help="Качество текстур персонажей. При нехватке VRAM держите низким; высокое "
+                "заметно улучшает различимость силуэтов.",
                 options=list(_UE_QUALITY_MAX),
             ),
             Setting(
-                "sg.EffectsTextureQuality", "1", "Текстуры эффектов", "ScalabilityGroups",
+                "sg.EffectsTextureQuality", "0", "Текстуры эффектов", "ScalabilityGroups",
                 help="Текстуры эффектов. Можно держать ниже остальных.",
                 options=list(_UE_QUALITY_MAX),
             ),
             Setting(
-                "sg.TextureFilteringQuality", "2", "Фильтрация текстур", "ScalabilityGroups",
-                help="Чёткость текстур под углом. Среднее — хороший баланс.",
+                "sg.TextureFilteringQuality", "1", "Фильтрация текстур", "ScalabilityGroups",
+                help="Чёткость текстур под углом. Низкое — минимум нагрузки; среднее чётче "
+                "почти без потери FPS.",
                 options=list(_UE_QUALITY_MAX),
             ),
             Setting(
@@ -735,9 +740,18 @@ GAMES: list[GameProfile] = [
             ),
             # --- Настройки самой игры (секция WDUserSettings) ---
             Setting(
-                "NvidiaDLSSMode", "4", "NVIDIA DLSS", "/Script/WDGame.WDUserSettings",
-                help="Апскейл NVIDIA: Quality — лучший баланс чёткости и FPS. 0 — выключить "
-                "(игра использует TAA). Геометрию режимов сверяйте с меню игры.",
+                "UpscalingMethod", "DLSS", "Метод сглаживания (апскейл)",
+                "/Script/WDGame.WDUserSettings",
+                help="Как в видео — NVIDIA DLSS. Варианты для других видеокарт: FSR 3 (AMD) "
+                "и XeSS (Intel), либо TSR/TAA без апскейла. Названия методов зависят от "
+                "версии игры — сверяйте с меню.",
+                options=[("DLSS", "NVIDIA DLSS"), ("FSR3", "AMD FSR 3"), ("XeSS", "Intel XeSS"),
+                         ("TSR", "TSR (без апскейла)"), ("TAA", "TAA")],
+            ),
+            Setting(
+                "NvidiaDLSSMode", "5", "NVIDIA DLSS", "/Script/WDGame.WDUserSettings",
+                help="Режим DLSS. В видео выбран «Баланс» — больше кадров, чем «Качество», "
+                "при сохранении читаемости целей. 0 — выключить (игра использует TAA).",
                 options=[("0", "Выкл (TAA)"), ("4", "Качество"), ("5", "Баланс"),
                          ("6", "Производительность")],
             ),
@@ -773,6 +787,20 @@ GAMES: list[GameProfile] = [
                 options=[("False", "Выкл"), ("True", "Вкл")],
             ),
             Setting(
+                "Brightness", "2.200000", "Яркость", "/Script/WDGame.WDUserSettings",
+                help="В видео — 110% (в конфиге 2,200000). Чуть ярче картинка: противников "
+                "лучше видно в тенях.",
+                options=[("1.800000", "90%"), ("2.000000", "100%"),
+                         ("2.200000", "110% (как в видео)"), ("2.400000", "120%")],
+            ),
+            Setting(
+                "Sharpness", "1.200000", "Резкость", "/Script/WDGame.WDUserSettings",
+                help="Пост-резкость изображения. В видео — 1,20: картинка чётче, цели на "
+                "дистанции читаются лучше.",
+                options=[("0.000000", "Выкл"), ("1.200000", "1,20"), ("1.500000", "1,50"),
+                         ("2.000000", "2,00")],
+            ),
+            Setting(
                 "FrameRateLimit", "0.000000", "Ограничение FPS",
                 "/Script/WDGame.WDUserSettings",
                 help="0 — без ограничений. Если фреймтайм неровный, поставьте частоту монитора "
@@ -780,6 +808,14 @@ GAMES: list[GameProfile] = [
                 options=[("0.000000", "Без ограничений"), ("60.000000", "60"),
                          ("120.000000", "120"), ("141.000000", "141"),
                          ("144.000000", "144"), ("240.000000", "240")],
+            ),
+            Setting(
+                "BackgroundFrameRateLimit", "120.000000", "Лимит FPS в меню",
+                "/Script/WDGame.WDUserSettings",
+                help="«Main Menu FPS Limit» из видео: в меню и фоне кадры ограничены, чтобы "
+                "видеокарта не грелась и не тратила ресурсы впустую.",
+                options=[("120.000000", "120"), ("60.000000", "60"),
+                         ("30.000000", "30"), ("144.000000", "144")],
             ),
             Setting(
                 "FullscreenMode", "1", "Режим экрана", "/Script/WDGame.WDUserSettings",
@@ -930,7 +966,6 @@ _PRESET_OVERRIDES: dict[str, dict[str, tuple[str, str]]] = {
         "sg.ViewDistanceQuality": ("3", "3"),
         "sg.MeshQuality": ("3", "3"),
         "sg.ShadingQuality": ("2", "3"),
-        "sg.ShadowQuality": ("2", "4"),
         "sg.GlobalIlluminationQuality": ("1", "2"),
         "sg.ReflectionQuality": ("1", "2"),
         "sg.PostProcessQuality": ("2", "3"),
@@ -947,6 +982,7 @@ _PRESET_OVERRIDES: dict[str, dict[str, tuple[str, str]]] = {
         "sg.BloomQuality": ("1", "2"),
         "sg.LensFlareQuality": ("1", "2"),
         "sg.DepthOfFieldQuality": ("1", "1"),
+        "NvidiaDLSSMode": ("5", "4"),
     },
 }
 
@@ -969,6 +1005,124 @@ class GameSettingsResult:
     message: str
     files: list[str] = field(default_factory=list)
     backup_dir: str = ""
+
+
+# ---------------------------------------------------------------------------
+# «Убрать тени»: sg.ShadowQuality=4 + защита файла от перезаписи игрой
+# ---------------------------------------------------------------------------
+SHADOW_KEY = "sg.ShadowQuality"
+SHADOW_DISABLED_VALUE = "4"
+
+
+@dataclass
+class ShadowStatus:
+    ok: bool
+    message: str
+    files: list[str] = field(default_factory=list)
+    value: str = ""
+    readonly: bool = False
+
+
+def _is_readonly(path: Path) -> bool:
+    try:
+        return not (path.stat().st_mode & stat.S_IWRITE)
+    except OSError:
+        return False
+
+
+def _set_readonly(path: Path, readonly: bool) -> None:
+    """Ставит/снимает атрибут «только чтение» (защита от записи игрой)."""
+    mode = path.stat().st_mode
+    path.chmod(mode & ~stat.S_IWRITE if readonly else mode | stat.S_IWRITE)
+
+
+def shadow_status(profile: GameProfile) -> ShadowStatus:
+    """Текущее значение sg.ShadowQuality и состояние защиты файла."""
+    files = find_game_files(profile)
+    if not files:
+        return ShadowStatus(
+            False,
+            f"Файл GameUserSettings.ini не найден — запустите {profile.name} хотя бы раз.",
+        )
+    path = files[0]
+    value = ""
+    try:
+        for line in path.read_text(encoding="utf-8", errors="replace").splitlines():
+            stripped = line.strip()
+            if stripped.lower().startswith(SHADOW_KEY.lower() + "="):
+                value = stripped.split("=", 1)[1].strip()
+                break
+    except OSError as exc:
+        return ShadowStatus(False, f"Не удалось прочитать файл: {exc}")
+    return ShadowStatus(
+        True, "", [str(p) for p in files], value, _is_readonly(path)
+    )
+
+
+def remove_shadows(profile: GameProfile, progress=None) -> GameSettingsResult:
+    """Ставит sg.ShadowQuality=4 и запрещает игре перезаписывать файл."""
+    if profile.key in running_game_keys():
+        return GameSettingsResult(False, f"Закройте {profile.name} и повторите.")
+    files = find_game_files(profile)
+    if not files:
+        return GameSettingsResult(
+            False, f"Файл настроек {profile.name} не найден — запустите игру хотя бы раз."
+        )
+
+    # Снимаем защиту, если она уже стоит, — иначе файл не перезаписать.
+    for path in files:
+        if _is_readonly(path):
+            try:
+                _set_readonly(path, False)
+            except OSError:
+                continue
+
+    setting = Setting(SHADOW_KEY, SHADOW_DISABLED_VALUE, "Тени", "ScalabilityGroups")
+    result = apply_setting_values(profile, [(setting, SHADOW_DISABLED_VALUE)], progress)
+    if not result.ok:
+        return result
+
+    protected: list[str] = []
+    for name in result.files:
+        path = Path(name)
+        try:
+            _set_readonly(path, True)
+            protected.append(str(path))
+        except OSError:
+            continue
+    if not protected:
+        return GameSettingsResult(
+            False, "Значение записано, но защиту «только чтение» поставить не удалось."
+        )
+    if progress:
+        progress(100, "Готово")
+    return GameSettingsResult(
+        True,
+        f"Тени убраны ({SHADOW_KEY}={SHADOW_DISABLED_VALUE}), файл защищён от сброса игрой "
+        f"({len(protected)}).",
+        protected,
+        result.backup_dir,
+    )
+
+
+def restore_shadows(profile: GameProfile, progress=None) -> GameSettingsResult:
+    """Снимает защиту файла и возвращает исходные настройки из резервной копии."""
+    if profile.key in running_game_keys():
+        return GameSettingsResult(False, f"Закройте {profile.name} и повторите.")
+    files = find_game_files(profile)
+    for path in files:
+        if _is_readonly(path):
+            try:
+                _set_readonly(path, False)
+            except OSError:
+                continue
+    result = restore_game_settings(profile, progress)
+    if result.ok:
+        return result
+    message = result.message
+    if any(_is_readonly(path) for path in files):
+        return result
+    return GameSettingsResult(False, f"{message} Защита «только чтение» снята.")
 
 
 # ---------------------------------------------------------------------------
@@ -1225,11 +1379,25 @@ def apply_setting_values(
                 manifest[str(path)] = str(backup_file)
             except OSError:
                 pass
+        # Файл может быть защищён приёмом «Убрать тени» (только чтение) —
+        # на время записи снимаем защиту и возвращаем её обратно.
+        readonly = _is_readonly(path)
+        if readonly:
+            try:
+                _set_readonly(path, False)
+            except OSError:
+                readonly = False
         try:
             path.write_text(_apply_text(profile, text, items), encoding="utf-8")
             changed.append(str(path))
         except OSError:
             continue
+        finally:
+            if readonly:
+                try:
+                    _set_readonly(path, True)
+                except OSError:
+                    pass
 
     _write_manifest(profile, manifest)
 
@@ -1263,12 +1431,24 @@ def restore_game_settings(profile: GameProfile, progress=None) -> GameSettingsRe
         original_path = Path(original)
         if not backup_path.is_file():
             continue
+        readonly = _is_readonly(original_path)
+        if readonly:
+            try:
+                _set_readonly(original_path, False)
+            except OSError:
+                readonly = False
         try:
             original_path.parent.mkdir(parents=True, exist_ok=True)
             shutil.copy2(backup_path, original_path)
             restored.append(str(original_path))
         except OSError:
             continue
+        finally:
+            if readonly and original_path.exists():
+                try:
+                    _set_readonly(original_path, True)
+                except OSError:
+                    pass
 
     # Удаляем использованные копии и манифест, чтобы следующее применение
     # снова сохранило исходное состояние.

@@ -23,8 +23,6 @@ from ..config import (
     APP_DISPLAY_NAME,
     APP_NAME,
     APP_VERSION,
-    load_settings,
-    save_settings,
 )
 from ..utils import resource_path
 from . import theme
@@ -35,7 +33,7 @@ from .pages.optimize import OptimizePage
 from .pages.settings import SettingsPage
 from .pages.tweaks import TweaksPage
 from .splash import SplashScreen
-from .widgets import Backdrop, ThemeToggleButton, nav_icon, scrollable
+from .widgets import Backdrop, nav_icon, scrollable
 
 
 class MainWindow(QMainWindow):
@@ -75,36 +73,25 @@ class MainWindow(QMainWindow):
         side_layout.addWidget(footer)
         layout.addWidget(sidebar)
 
-        # Область содержимого: верхняя панель с переключателем темы + страницы
+        # Область содержимого: страницы
         content = QWidget()
         content_layout = QVBoxLayout(content)
         content_layout.setContentsMargins(0, 0, 0, 0)
         content_layout.setSpacing(0)
-
-        top_bar = QWidget()
-        top_bar.setObjectName("TopBar")
-        top_layout = QHBoxLayout(top_bar)
-        top_layout.setContentsMargins(24, 12, 24, 0)
-        top_layout.setSpacing(0)
-        top_layout.addStretch(1)
-        self.theme_btn = ThemeToggleButton()
-        self.theme_btn.clicked.connect(self.toggle_theme)
-        top_layout.addWidget(self.theme_btn)
-        content_layout.addWidget(top_bar)
 
         self.stack = QStackedWidget()
         content_layout.addWidget(self.stack, 1)
         layout.addWidget(content, 1)
 
         definitions: list[tuple[str, QWidget, bool]] = [
-            ("Характеристики", DashboardPage(), True),
-            ("Драйверы", DriversPage(), True),
-            ("Оптимизация", OptimizePage(), False),
             ("Игры", GamesPage(), True),
             ("Твики", TweaksPage(), False),
+            ("Драйверы", DriversPage(), True),
+            ("Оптимизация", OptimizePage(), False),
+            ("Характеристики", DashboardPage(), True),
             ("Настройки", SettingsPage(), True),
         ]
-        self._nav_kinds = ["info", "driver", "speed", "games", "tweaks", "settings"]
+        self._nav_kinds = ["games", "tweaks", "driver", "speed", "info", "settings"]
         self.pages: list[tuple[str, QWidget]] = []
         for name, page, use_scroll in definitions:
             container = scrollable(page) if use_scroll else page
@@ -114,9 +101,9 @@ class MainWindow(QMainWindow):
 
         self.nav.currentRowChanged.connect(self.stack.setCurrentIndex)
         self.nav.currentRowChanged.connect(self._update_nav_icons)
+        # Приложение открывается сразу на «Играх».
         self.nav.setCurrentRow(0)
 
-        self._update_theme_button()
         self._update_nav_icons()
 
     # ------------------------------------------------------------------
@@ -128,30 +115,6 @@ class MainWindow(QMainWindow):
             kind = self._nav_kinds[index] if index < len(self._nav_kinds) else "info"
             color = palette["ACCENT"] if index == current else palette["TEXT_DIM"]
             item.setIcon(nav_icon(kind, color))
-
-    def _update_theme_button(self) -> None:
-        if theme.current() == "dark":
-            self.theme_btn.setToolTip("Включить светлую тему")
-        else:
-            self.theme_btn.setToolTip("Включить тёмную тему")
-        self.theme_btn.update()
-
-    def toggle_theme(self) -> None:
-        new_mode = "light" if theme.current() == "dark" else "dark"
-        theme.set_current(new_mode)
-        app = QApplication.instance()
-        if app is not None:
-            app.setStyleSheet(theme.styles())
-        self._update_theme_button()
-        self.backdrop.update()
-        for _name, page in self.pages:
-            hook = getattr(page, "on_theme_changed", None)
-            if callable(hook):
-                hook()
-        self._update_nav_icons()
-        settings = load_settings()
-        settings["theme"] = new_mode
-        save_settings(settings)
 
 
 def _splash_message(value: float) -> str:
@@ -174,7 +137,6 @@ def run() -> int:
     if os.path.exists(icon_path):
         app.setWindowIcon(QIcon(icon_path))
 
-    theme.set_current(str(load_settings().get("theme", "dark")))
     app.setStyleSheet(theme.styles())
 
     splash = SplashScreen()

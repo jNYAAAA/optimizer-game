@@ -41,17 +41,11 @@ class WinSettingsPage(QWidget):
         else:
             root.setContentsMargins(0, 0, 0, 0)
 
-        self.help_label = QLabel("Наведите на значок (i), чтобы узнать, за что отвечает настройка.")
-        self.help_label.setObjectName("PageHint")
-        self.help_label.setWordWrap(True)
-        root.addWidget(self.help_label)
-
         card = Card("Параметры")
         self._rows: list[tuple[WinSetting, OptionRow]] = []
         for setting in self._settings:
             row = OptionRow(setting.name, setting.help, setting.options, setting.value)
             row.apply_requested.connect(lambda value, s=setting: self._apply_one(s, value))
-            row.help_hovered.connect(self._on_help)
             card.body.addWidget(row, card.body.rowCount(), 0, 1, 2)
             self._rows.append((setting, row))
         root.addWidget(card)
@@ -88,11 +82,6 @@ class WinSettingsPage(QWidget):
         if not self._loaded:
             self._loaded = True
             self.refresh()
-
-    def _on_help(self, text: str) -> None:
-        self.help_label.setText(
-            text or "Наведите на значок (i), чтобы узнать, за что отвечает настройка."
-        )
 
     def refresh(self) -> None:
         self.progress.setRange(0, 0)

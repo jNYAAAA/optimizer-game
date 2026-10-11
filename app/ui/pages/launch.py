@@ -1,8 +1,8 @@
 """Параметры запуска игры (Steam).
 
 Строка параметров хранится в конфигурации Steam, поэтому приложение
-показывает её, подставляет рекомендованный набор и записывает обратно
-(с резервной копией и возможностью возврата).
+подставляет рекомендованный набор прямо в поле, а остаётся нажать «Применить».
+Перед записью делается резервная копия (возврат доступен из API ядра).
 """
 from __future__ import annotations
 
@@ -11,7 +11,6 @@ from PySide6.QtWidgets import (
     QHBoxLayout,
     QLabel,
     QLineEdit,
-    QMessageBox,
     QProgressBar,
     QPushButton,
     QVBoxLayout,
@@ -25,7 +24,6 @@ from ...core.launch_options import (
     LaunchOptionsResult,
     apply_launch_options,
     current_launch_options,
-    restore_launch_options,
     steam_running,
 )
 from ...core.workers import Worker, start_worker
@@ -42,6 +40,7 @@ class LaunchOptionsPage(QWidget):
     ) -> None:
         super().__init__(parent)
         self.game_key = game_key
+        self.appid = STEAM_APPIDS.get(game_key)
 
         root = QVBoxLayout(self)
         root.setSpacing(14)
@@ -50,24 +49,19 @@ class LaunchOptionsPage(QWidget):
             root.addWidget(
                 make_header(
                     "Параметры запуска",
-                    "Строка параметров запуска игры из Steam. Приложение записывает её "
-                    "в конфигурацию Steam напрямую — Steam при этом должен быть закрыт.",
+                    "Строка параметров запуска игры из Steam. Рекомендованные параметры уже "
+                    "подставлены — проверьте и нажмите «Применить». Steam должен быть закрыт.",
                 )
             )
         else:
             root.setContentsMargins(0, 0, 0, 0)
 
-        self.help_label = QLabel(
-            "Параметры применяются к Steam-версии игры. Закройте Steam перед записью."
-        )
+        self.help_label = QLabel("Чтение настроек Steam…")
         self.help_label.setObjectName("PageHint")
         self.help_label.setWordWrap(True)
         root.addWidget(self.help_label)
 
         card = Card("Параметры запуска Steam")
-        appid = STEAM_APPIDS.get(game_key)
-        self.appid_label = card.add_row("Идентификатор Steam", str(appid) if appid else "—")
-        self.file_label = card.add_row("Конфигурация Steam", "Поиск…")
         row = card.body.rowCount()
         caption = QLabel("ПАРАМЕТРЫ")
         caption.setObjectName("Caption")
@@ -76,8 +70,6 @@ class LaunchOptionsPage(QWidget):
         self.edit.setPlaceholderText("например: -dx12 -high -nosplash")
         self.edit.setClearButtonEnabled(True)
         card.body.addWidget(self.edit, row, 1)
-        if not appid:
-            self.edit.setEnabled(False)
         root.addWidget(card)
 
         hint = QLabel(RECOMMENDED_HELP)
@@ -90,16 +82,9 @@ class LaunchOptionsPage(QWidget):
         self.apply_btn.setObjectName("Primary")
         self.apply_btn.clicked.connect(self._apply)
         controls.addWidget(self.apply_btn)
-        self.recommend_btn = QPushButton("РЕКОМЕНДОВАННЫЕ")
-        self.recommend_btn.clicked.connect(self._fill_recommended)
-        controls.addWidget(self.recommend_btn)
         self.clear_btn = QPushButton("ОЧИСТИТЬ СТРОКУ")
         self.clear_btn.clicked.connect(self._clear)
         controls.addWidget(self.clear_btn)
-        self.restore_btn = QPushButton("ВОССТАНОВИТЬ")
-        self.restore_btn.setObjectName("Danger")
-        self.restore_btn.clicked.connect(self._restore)
-        controls.addWidget(self.restore_btn)
         self.refresh_btn = QPushButton("ОБНОВИТЬ")
         self.refresh_btn.clicked.connect(self.refresh)
         controls.addWidget(self.refresh_btn)
@@ -116,10 +101,14 @@ class LaunchOptionsPage(QWidget):
         root.addWidget(self.log)
         root.addStretch(1)
 
-        self.apply_btn.setEnabled(False)
-        self.restore_btn.setEnabled(False)
-        if not appid:
-            self.recommend_btn.setEnabled(False)
+        if self.appid is None:
+            self.edit.setEnabled(False)
+            self.apply_btn.setEnabled(False)
+            self.clear_btn.setEnabled(False)
+            self.refresh_btn.setEnabled(False)
+            self.help_label.setText(
+                "Для этой игры неизвестен идентификатор Steam — параметры запуска недоступны."
+            )
         self._loaded = False
 
     # ------------------------------------------------------------------
@@ -130,9 +119,7 @@ class LaunchOptionsPage(QWidget):
             self.refresh()
 
     def refresh(self) -> None:
-        if self.game_key not in STEAM_APPIDS:
-            self.file_label.setText("Для этой игры параметры запуска недоступны.")
-            self.log.log("Игра не найдена в Steam (неизвестен идентификатор).")
+        if self.appid is None:
             return
         self.progress.setRange(0, 0)
         self.refresh_btn.setEnabled(False)
@@ -149,61 +136,55 @@ class LaunchOptionsPage(QWidget):
         palette = theme.palette()
 
         if not files:
-            self.file_label.setText("localconfig.vdf не найден — установлен ли Steam?")
             self.apply_btn.setEnabled(False)
-            self.status("Конфигурация Steam не найдена.", palette["DANGER"])
+            self.status(
+                "Конфигурация Steam (localconfig.vdf) не найдена — установлен ли Steam?",
+                palette["DANGER"],
+            )
             return
 
-        self.file_label.setText(f'{len(files)}: {files[0]}')
-        if value:
-            self.edit.setText(value)
-        self.apply_btn.setEnabled(True)
-        self.restore_btn.setEnabled(True)
+        where = f"Файл: {files[0]}" + (f" (всего {len(files)})" if len(files) > 1 else "")
+        recommended = RECOMMENDED.get(self.game_key, "")
+        running = steam_running()
 
         if value is None:
+            self.apply_btn.setEnabled(False)
+            if recommended:
+                self.edit.setText(recommended)
             self.status(
                 "Игра ещё не появлялась в конфигурации Steam — запустите её через Steam "
                 "хотя бы раз, затем нажмите «Обновить».",
                 palette["WARN"],
             )
-            self.apply_btn.setEnabled(False)
             return
-        note = " Steam запущен — закройте его перед записью." if steam_running() else ""
-        self.status(
-            f"Найдено файлов конфигурации: {len(files)}.{note}",
-            palette["WARN"] if note else palette["TEXT_DIM"],
-        )
+
+        self.apply_btn.setEnabled(True)
+        if recommended:
+            # Рекомендованные параметры подставлены сразу — остаётся нажать «Применить».
+            self.edit.setText(recommended)
+            if value == recommended:
+                note = "В Steam уже записаны рекомендованные параметры."
+            elif value:
+                note = f"Рекомендованные подставлены вместо текущих («{value}»)."
+            else:
+                note = "Рекомендованные параметры подставлены — нажмите «Применить»."
+        elif value:
+            self.edit.setText(value)
+            note = "Текущие параметры запуска загружены из Steam."
+        else:
+            note = "Параметры запуска не заданы — впишите строку и нажмите «Применить»."
+        if running:
+            note += " Steam запущен: закройте его, иначе запись потеряется."
+        self.status(f"{note} {where}", palette["WARN"] if running else palette["TEXT_DIM"])
 
     def status(self, text: str, color: str) -> None:
         self.help_label.setText(text)
-        self.help_label.setStyleSheet(f"color: {color};")
-        if color == theme.palette()["TEXT_DIM"]:
-            self.help_label.setStyleSheet("")
+        self.help_label.setStyleSheet("" if color == theme.palette()["TEXT_DIM"] else f"color: {color};")
 
     # ------------------------------------------------------------------
-    def _fill_recommended(self) -> None:
-        value = RECOMMENDED.get(self.game_key, "")
-        if value:
-            self.edit.setText(value)
-            self.log.log("Подставлены рекомендованные параметры запуска.")
-        else:
-            self.log.log("Готовых параметров для этой игры нет — введите строку вручную.")
-
     def _clear(self) -> None:
         self.edit.clear()
-        self.log.log("Строка параметров очищена. Нажмите «Применить», чтобы сохранить.")
-
-    def _restore(self) -> None:
-        answer = QMessageBox.question(
-            self,
-            "Возврат параметров запуска",
-            "Вернуть исходные параметры запуска из резервной копии?",
-            QMessageBox.Yes | QMessageBox.No,
-            QMessageBox.No,
-        )
-        if answer != QMessageBox.Yes:
-            return
-        self._run("Возврат параметров запуска…", restore_launch_options, self.game_key)
+        self.log.log("Строка очищена. Нажмите «Применить», чтобы убрать параметры запуска.")
 
     def _apply(self) -> None:
         value = self.edit.text().strip()
@@ -222,7 +203,7 @@ class LaunchOptionsPage(QWidget):
         start_worker(worker)
 
     def _set_busy(self, busy: bool) -> None:
-        for button in (self.apply_btn, self.restore_btn, self.refresh_btn, self.recommend_btn):
+        for button in (self.apply_btn, self.clear_btn, self.refresh_btn):
             button.setEnabled(not busy)
 
     def _on_progress(self, percent: int, message: str) -> None:

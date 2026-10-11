@@ -1,7 +1,7 @@
-"""Темы оформления в стиле Windows 11 (Fluent Design).
+"""Тема оформления в стиле Windows 11 (тёмная).
 
-Две палитры — светлая и тёмная, как в Windows 11. QSS-шаблон подставляет цвета
-через ``str.format``; галочки чекбоксов берутся из PNG-ресурсов.
+Одна палитра; QSS-шаблон подставляет цвета через ``str.format``, галочки
+чекбоксов берутся из PNG-ресурса.
 """
 from __future__ import annotations
 
@@ -12,31 +12,6 @@ from ..utils import resource_path
 FONT = '"Segoe UI Variable Text", "Segoe UI", "Bahnschrift", "Verdana", sans-serif'
 FONT_TITLE = '"Bahnschrift SemiBold", "Bahnschrift", "Segoe UI Variable Display", "Segoe UI", sans-serif'
 FONT_MONO = '"Cascadia Mono", "Consolas", "Courier New", monospace'
-
-LIGHT = {
-    "NAME": "light",
-    "MONO": FONT,
-    "FONT": FONT,
-    "FONT_TITLE": FONT_TITLE,
-    "FONT_MONO": FONT_MONO,
-    "BG": "#f3f3f3",
-    "BG_ALT": "#ececec",
-    "PANEL": "#ffffff",
-    "BORDER": "#e0e0e0",
-    "CONTROL": "#fdfdfd",
-    "CONTROL_HOVER": "#f5f5f5",
-    "CONTROL_PRESSED": "#ededed",
-    "ACCENT": "#0067c0",
-    "ACCENT_DIM": "#005ba1",
-    "MAGENTA": "#c239b3",
-    "TEXT": "#1b1b1b",
-    "TEXT_DIM": "#5f5f5f",
-    "TEXT_FAINT": "#9b9b9b",
-    "ON_ACCENT": "#ffffff",
-    "DANGER": "#c42b1c",
-    "WARN": "#9d5d00",
-    "OK": "#0f7b0f",
-}
 
 DARK = {
     "NAME": "dark",
@@ -53,6 +28,7 @@ DARK = {
     "CONTROL_PRESSED": "rgba(40, 46, 54, 0.8)",
     "ACCENT": "#60cdff",
     "ACCENT_DIM": "#4cc2ff",
+    "ACCENT_SOFT": "rgba(96, 205, 255, 0.16)",
     "MAGENTA": "#ff2e97",
     "TEXT": "#ffffff",
     "TEXT_DIM": "#c9c9c9",
@@ -63,40 +39,21 @@ DARK = {
     "OK": "#6ccb5f",
 }
 
-PALETTES = {"dark": DARK, "light": LIGHT}
 
-_current = "dark"
-
-
-def palette(mode: str | None = None) -> dict:
-    return PALETTES.get(mode or _current, DARK)
+def palette() -> dict:
+    return DARK
 
 
-def current() -> str:
-    return _current
-
-
-def set_current(mode: str) -> None:
-    global _current
-    if mode in PALETTES:
-        _current = mode
-
-
-def is_dark(mode: str | None = None) -> bool:
-    return (mode or _current) == "dark"
-
-
-def risk_colors(mode: str | None = None) -> dict[str, str]:
-    p = palette(mode)
+def risk_colors() -> dict[str, str]:
+    p = palette()
     return {"low": p["OK"], "medium": p["WARN"], "high": p["DANGER"]}
 
 
-RISK_COLORS = risk_colors("dark")
+RISK_COLORS = risk_colors()
 
 
-def _check_icon(dark: bool) -> str:
-    name = "check_dark.png" if dark else "check_white.png"
-    return resource_path(os.path.join("assets", name)).replace("\\", "/")
+def _check_icon() -> str:
+    return resource_path(os.path.join("assets", "check_dark.png")).replace("\\", "/")
 
 
 _TEMPLATE = """
@@ -173,19 +130,21 @@ _TEMPLATE = """
         padding: 4px 8px;
     }}
     QListWidget#Nav::item {{
-        padding: 9px 12px;
-        margin: 2px 0;
-        border-radius: 5px;
-        border-left: 3px solid transparent;
+        padding: 10px 12px;
+        margin: 3px 0;
+        border-radius: 8px;
         color: {TEXT};
     }}
     QListWidget#Nav::item:hover {{
         background: {CONTROL_HOVER};
     }}
     QListWidget#Nav::item:selected {{
-        background: {CONTROL_PRESSED};
-        border-left: 3px solid {ACCENT};
+        background: {ACCENT_SOFT};
+        color: {TEXT};
         font-weight: 600;
+    }}
+    QListWidget#Nav::item:selected:hover {{
+        background: {ACCENT_SOFT};
     }}
 
     QFrame#Card {{
@@ -446,7 +405,7 @@ _TEMPLATE = """
 """
 
 
-def styles(mode: str | None = None) -> str:
-    p = dict(palette(mode))
-    p["CHECK"] = _check_icon(p.get("NAME") == "dark")
+def styles() -> str:
+    p = dict(palette())
+    p["CHECK"] = _check_icon()
     return _TEMPLATE.format(**p)

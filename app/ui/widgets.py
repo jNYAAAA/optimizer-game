@@ -17,7 +17,6 @@ from PySide6.QtGui import (
     QRadialGradient,
 )
 from PySide6.QtWidgets import (
-    QAbstractButton,
     QComboBox,
     QFrame,
     QGridLayout,
@@ -133,7 +132,7 @@ class Backdrop(QWidget):
         rect = self.rect()
 
         base = QColor(colors["BG"])
-        end = base.lighter(118) if theme.is_dark() else base.darker(104)
+        end = base.lighter(118)
         gradient = QLinearGradient(rect.topLeft(), rect.bottomRight())
         gradient.setColorAt(0.0, base)
         gradient.setColorAt(1.0, end)
@@ -178,52 +177,6 @@ class LogView(QPlainTextEdit):
         self.appendPlainText(f"[{datetime.now():%H:%M:%S}] {message}")
 
 
-class ThemeToggleButton(QAbstractButton):
-    """Иконка луны: цвет берётся из акцента текущей темы."""
-
-    def __init__(self, parent: QWidget | None = None) -> None:
-        super().__init__(parent)
-        self.setCursor(Qt.PointingHandCursor)
-        self.setFocusPolicy(Qt.NoFocus)
-        self.setFixedSize(36, 36)
-        self._hover = False
-
-    def enterEvent(self, event) -> None:  # noqa: N802 - Qt API
-        self._hover = True
-        self.update()
-        super().enterEvent(event)
-
-    def leaveEvent(self, event) -> None:  # noqa: N802 - Qt API
-        self._hover = False
-        self.update()
-        super().leaveEvent(event)
-
-    def paintEvent(self, event) -> None:  # noqa: N802 - Qt API
-        colors = theme.palette()
-        painter = QPainter(self)
-        painter.setRenderHint(QPainter.Antialiasing, True)
-
-        if self._hover:
-            ring = QRectF(self.rect()).adjusted(1.5, 1.5, -1.5, -1.5)
-            painter.setPen(QPen(QColor(colors["BORDER"]), 1))
-            painter.setBrush(Qt.NoBrush)
-            painter.drawEllipse(ring)
-
-        inner = QRectF(self.rect()).adjusted(10, 10, -10, -10)
-        radius = inner.width()
-        full = QPainterPath()
-        full.addEllipse(inner)
-        cut = QPainterPath()
-        cut.addEllipse(inner.translated(radius * 0.45, -radius * 0.45))
-        crescent = full.subtracted(cut)
-
-        color = QColor(colors["ACCENT_DIM"] if self._hover else colors["ACCENT"])
-        painter.setPen(Qt.NoPen)
-        painter.setBrush(color)
-        painter.drawPath(crescent)
-        painter.end()
-
-
 class InfoIcon(QLabel):
     """Значок «i» с пояснением, всплывающим при наведении."""
 
@@ -236,6 +189,11 @@ class InfoIcon(QLabel):
         if not pixmap.isNull():
             self.setPixmap(pixmap)
         self.setCursor(Qt.WhatsThisCursor)
+        self.setToolTip(text)
+
+    def set_text(self, text: str) -> None:
+        """Обновляет пояснение (например, когда изменилось выбранное значение)."""
+        self._text = text
         self.setToolTip(text)
 
     def enterEvent(self, event) -> None:  # noqa: N802 - Qt API

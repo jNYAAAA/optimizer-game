@@ -81,11 +81,6 @@ class NvidiaPage(QWidget):
         else:
             root.setContentsMargins(0, 0, 0, 0)
 
-        self.help_label = QLabel("Наведите на значок (i), чтобы узнать, что делает параметр.")
-        self.help_label.setObjectName("PageHint")
-        self.help_label.setWordWrap(True)
-        root.addWidget(self.help_label)
-
         preset_row = QHBoxLayout()
         preset_row.setSpacing(8)
         preset_label = QLabel("Профиль:")
@@ -107,7 +102,6 @@ class NvidiaPage(QWidget):
         self._rows: list[tuple[object, OptionRow]] = []
         for setting in self.settings:
             row = OptionRow(setting.name, setting.help, setting.options, setting.value, show_apply=False)
-            row.help_hovered.connect(self._on_help)
             card.body.addWidget(row, card.body.rowCount(), 0, 1, 2)
             self._rows.append((setting, row))
         root.addWidget(card)
@@ -192,11 +186,6 @@ class NvidiaPage(QWidget):
     def _on_apply_failed(self, message: str) -> None:
         self.apply_btn.setEnabled(True)
         self.log.log(f"Не удалось применить настройки NVIDIA: {message}")
-
-    def _on_help(self, text: str) -> None:
-        self.help_label.setText(
-            text or "Наведите на значок (i), чтобы узнать, что делает параметр."
-        )
 
     def _values(self) -> dict:
         return {setting.key: row.value() for setting, row in self._rows}

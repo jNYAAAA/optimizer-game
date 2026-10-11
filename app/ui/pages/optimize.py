@@ -90,9 +90,3 @@ class OptimizePage(QWidget):
             button.setChecked(i == index)
         self.stack.setCurrentIndex(index)
         self.hint_label.setText(_SECTIONS[index][1])
-
-    def on_theme_changed(self) -> None:
-        for page in self.pages:
-            hook = getattr(page, "on_theme_changed", None)
-            if callable(hook):
-                hook()

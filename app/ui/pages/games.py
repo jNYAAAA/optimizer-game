@@ -3,8 +3,17 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from PySide6.QtCore import Qt, QThreadPool, Signal
-from PySide6.QtGui import QPixmap
+from PySide6.QtCore import QRectF, Qt, QThreadPool, Signal
+from PySide6.QtGui import (
+    QBrush,
+    QColor,
+    QFont,
+    QLinearGradient,
+    QPainter,
+    QPainterPath,
+    QPen,
+    QPixmap,
+)
 from PySide6.QtWidgets import (
     QComboBox,
     QFrame,
@@ -37,47 +46,126 @@ from .. import theme
 from ..widgets import Card, InfoIcon, LogView, make_header
 from .launch import LaunchOptionsPage
 from .nvidia import NvidiaPage
+from .shadows import NoShadowsPage
 from .win_settings import WinSettingsPage
 
-COVER_W, COVER_H = 155, 232
+# Обложка в сетке занимает всю плитку (соотношение картинок 2:3).
+TILE_MIN, TILE_MAX = 150, 340
+TILE_RATIO = 1.5
+TILE_RADIUS = 10
+GRID_SPACING = 22
+GRID_SPACING_MAX = 46
 
-# Под-разделы экрана игры.
+# Под-разделы экрана игры. «Убрать тени» — сразу после «Игра» и только у игр,
+# у которых включён флаг profile.disable_shadows.
 SECTIONS = ["ИГРА", "NVIDIA", "ЗАПУСК", "WINDOWS"]
+SHADOW_SECTION = "УБРАТЬ ТЕНИ"
 
 
-def _cover_pixmap(profile: GameProfile, width: int, height: int) -> QPixmap:
-    pixmap = QPixmap(resource_path(f"assets/{profile.logo}"))
-    if pixmap.isNull():
-        return pixmap
-    return pixmap.scaled(width, height, Qt.KeepAspectRatio, Qt.SmoothTransformation)
+def _cover_pixmap(profile: GameProfile, width: int, height: int, fill: bool = False) -> QPixmap:
+    source = QPixmap(resource_path(f"assets/{profile.logo}"))
+    if source.isNull():
+        return source
+    if fill:
+        return _fill_pixmap(source, width, height)
+    return source.scaled(width, height, Qt.KeepAspectRatio, Qt.SmoothTransformation)
+
+
+def _fill_pixmap(source: QPixmap, width: int, height: int) -> QPixmap:
+    """Обрезает картинку «под заполнение» плитки; скругление делает сама плитка."""
+    if source.isNull():
+        return source
+    scaled = source.scaled(
+        width, height, Qt.KeepAspectRatioByExpanding, Qt.SmoothTransformation
+    )
+    x = max((scaled.width() - width) // 2, 0)
+    y = max((scaled.height() - height) // 2, 0)
+    return scaled.copy(x, y, width, height)
 
 
 class _GameTile(QFrame):
+    """Плитка игры: обложка, градиент, название и обводка — всё рисуется вручную.
+
+    QLabel внутри плитки не используется: так скругление и подсветка ложатся
+    ровно по контуру, без «просветов» рамки по краям.
+    """
+
     clicked = Signal()
 
     def __init__(self, profile: GameProfile, parent: QWidget | None = None) -> None:
         super().__init__(parent)
-        self.setObjectName("Card")
+        self.profile = profile
+        self.setObjectName("GameTile")
         self.setCursor(Qt.PointingHandCursor)
-        self.setFixedSize(205, 320)
+        self.setAttribute(Qt.WA_Hover, True)
+        self._hover = False
+        self._source = QPixmap(resource_path(f"assets/{profile.logo}"))
+        self._cover = QPixmap()
+        # Стартовый размер — минимальный, иначе фиксированные плитки не дают
+        # странице ужаться и сетка вылезает за край окна.
+        self.set_size(TILE_MIN, int(TILE_MIN * TILE_RATIO))
 
-        layout = QVBoxLayout(self)
-        layout.setContentsMargins(16, 16, 16, 14)
-        layout.setSpacing(12)
+    # ------------------------------------------------------------------
+    def set_size(self, width: int, height: int) -> None:
+        """Меняет размер плитки и пересобирает обложку под новый размер."""
+        self.setFixedSize(width, height)
+        self._cover = _fill_pixmap(self._source, width, height)
+        self.update()
 
-        cover = QLabel()
-        cover.setAlignment(Qt.AlignCenter)
-        pixmap = _cover_pixmap(profile, COVER_W, COVER_H)
-        if not pixmap.isNull():
-            cover.setPixmap(pixmap)
-        layout.addWidget(cover, 0, Qt.AlignHCenter)
+    def enterEvent(self, event) -> None:  # noqa: N802 - Qt API
+        self._hover = True
+        self.update()
+        super().enterEvent(event)
 
-        name = QLabel(profile.name)
-        name.setAlignment(Qt.AlignCenter)
-        name.setWordWrap(True)
-        name.setStyleSheet("font-size: 15px; font-weight: 600;")
-        layout.addWidget(name)
-        layout.addStretch(1)
+    def leaveEvent(self, event) -> None:  # noqa: N802 - Qt API
+        self._hover = False
+        self.update()
+        super().leaveEvent(event)
+
+    def paintEvent(self, event) -> None:  # noqa: N802 - Qt API
+        colors = theme.palette()
+        painter = QPainter(self)
+        painter.setRenderHint(QPainter.Antialiasing, True)
+        painter.setRenderHint(QPainter.SmoothPixmapTransform, True)
+
+        width, height = self.width(), self.height()
+        # Обложка кладётся ровно по контуру плитки: скругляет её только маска,
+        # поэтому по краям не остаётся ни окантовки, ни «вылезающих» углов.
+        clip = QPainterPath()
+        clip.addRoundedRect(QRectF(0, 0, width, height), TILE_RADIUS, TILE_RADIUS)
+        painter.setClipPath(clip)
+
+        if self._cover.isNull():
+            painter.fillRect(self.rect(), QColor(38, 44, 52))
+        else:
+            painter.drawPixmap(0, 0, self._cover)
+
+        # Затемнение снизу под название.
+        gradient = QLinearGradient(0, height * 0.55, 0, height)
+        gradient.setColorAt(0.0, QColor(0, 0, 0, 0))
+        gradient.setColorAt(0.6, QColor(0, 0, 0, 130))
+        gradient.setColorAt(1.0, QColor(0, 0, 0, 215))
+        painter.fillPath(clip, QBrush(gradient))
+
+        font = QFont(self.font())
+        font.setPointSizeF(max(10.0, width * 0.05))
+        font.setBold(True)
+        painter.setFont(font)
+        painter.setPen(QColor("#FFFFFF"))
+        text_area = QRectF(8, height - 56, width - 16, 44)
+        painter.drawText(
+            text_area, int(Qt.AlignHCenter | Qt.AlignBottom | Qt.TextWordWrap), self.profile.name
+        )
+
+        # Подсветка при наведении — по контуру, ровно внутри плитки.
+        if self._hover:
+            painter.setClipping(False)
+            painter.setBrush(Qt.NoBrush)
+            painter.setPen(QPen(QColor(colors["ACCENT"]), 2))
+            painter.drawRoundedRect(
+                QRectF(1, 1, width - 2, height - 2), TILE_RADIUS, TILE_RADIUS
+            )
+        painter.end()
 
     def mousePressEvent(self, event) -> None:  # noqa: N802 - Qt API
         self.clicked.emit()
@@ -115,12 +203,24 @@ class _SettingRow(QFrame):
         self.combo.setMinimumWidth(170)
         layout.addWidget(self.combo)
 
+        # Подсказка показывает ключ в файле и точное значение, которое будет
+        # записано, — удобно сверять с GameUserSettings.ini.
+        self.info.set_text(self.hint())
+        self.combo.currentIndexChanged.connect(lambda _index=0: self.info.set_text(self.hint()))
+
         self.apply_btn = QPushButton("ПРИМЕНИТЬ")
         self.apply_btn.setObjectName("Segment")
         self.apply_btn.clicked.connect(
             lambda: self.apply_requested.emit(self.setting, self.combo.currentData())
         )
         layout.addWidget(self.apply_btn)
+
+    def hint(self) -> str:
+        base = self.setting.help or self.setting.label
+        return (
+            f"{base}\n\nКлюч в файле: {self.setting.key}\n"
+            f"Будет записано: {self.setting.key}={self.value()}"
+        )
 
     def value(self) -> str:
         return self.combo.currentData()
@@ -141,11 +241,6 @@ class _GameSettingsSection(QWidget):
         root = QVBoxLayout(self)
         root.setContentsMargins(0, 0, 0, 0)
         root.setSpacing(12)
-
-        self.help_label = QLabel("Наведите на значок (i), чтобы узнать, за что отвечает настройка.")
-        self.help_label.setObjectName("PageHint")
-        self.help_label.setWordWrap(True)
-        root.addWidget(self.help_label)
 
         preset_bar = QWidget()
         preset_row = QHBoxLayout(preset_bar)
@@ -173,7 +268,6 @@ class _GameSettingsSection(QWidget):
         for setting in profile.settings:
             row = _SettingRow(setting)
             row.apply_requested.connect(self._apply_one)
-            row.help_hovered.connect(self._on_help)
             card.body.addWidget(row, card.body.rowCount(), 0, 1, 2)
             self._rows.append(row)
         card.setVisible(bool(profile.settings))
@@ -204,17 +298,6 @@ class _GameSettingsSection(QWidget):
         self.log = LogView()
         self.log.setMaximumHeight(90)
         root.addWidget(self.log)
-
-        # Блоки NVIDIA и параметров запуска собраны в этом же разделе, чтобы всё
-        # нужное для игры было в одном месте. Создаются при первом показе
-        # раздела — так открытие панели и смена темы остаются быстрыми.
-        self.extras = QVBoxLayout()
-        self.extras.setContentsMargins(0, 0, 0, 0)
-        self.extras.setSpacing(14)
-        root.addLayout(self.extras)
-        self.extra_pages: list[QWidget] = []
-        self._extras_built = False
-
         root.addStretch(1)
 
         self._loaded = False
@@ -223,25 +306,7 @@ class _GameSettingsSection(QWidget):
         super().showEvent(event)
         if not self._loaded:
             self._loaded = True
-            self._build_extras()
             self.refresh()
-
-    def _build_extras(self) -> None:
-        """Добавляет в раздел «Игра» блоки NVIDIA и параметров запуска."""
-        if self._extras_built:
-            return
-        self._extras_built = True
-        for page in (
-            NvidiaPage(self.profile.key, show_header=False),
-            LaunchOptionsPage(self.profile.key, show_header=False),
-        ):
-            self.extra_pages.append(page)
-            self.extras.addWidget(page)
-
-    def _on_help(self, text: str) -> None:
-        self.help_label.setText(
-            text or "Наведите на значок (i), чтобы узнать, за что отвечает настройка."
-        )
 
     def _apply_preset(self, key: str) -> None:
         for row in self._rows:
@@ -385,8 +450,8 @@ class _GamePanel(QWidget):
         name.setObjectName("PageTitle")
         info.addWidget(name)
         caption = QLabel(
-            f"{len(profile.settings)} настроек игры · ниже в этом же разделе — "
-            "параметры NVIDIA и запуска Steam"
+            f"{len(profile.settings)} настроек игры · «Убрать тени», NVIDIA и параметры "
+            "запуска — в своих разделах"
         )
         caption.setObjectName("Caption")
         info.addWidget(caption)
@@ -396,13 +461,15 @@ class _GamePanel(QWidget):
 
         self._section_stack = QStackedWidget()
         self._section_buttons: list[QPushButton] = []
-        settings_section = _GameSettingsSection(profile)
+        self.sections = list(SECTIONS)
+        if profile.disable_shadows:
+            self.sections.insert(self.sections.index("ИГРА") + 1, SHADOW_SECTION)
         # Под-разделы создаются только при первом открытии —
         # это заметно ускоряет запуск и смену темы.
-        self._section_pages: list[QWidget | None] = [settings_section, None, None, None]
+        self._section_pages: list[QWidget | None] = [None] * len(self.sections)
         segment = QHBoxLayout()
         segment.setSpacing(8)
-        for index, title in enumerate(SECTIONS):
+        for index, title in enumerate(self.sections):
             button = QPushButton(title)
             button.setObjectName("Segment")
             button.setCheckable(True)
@@ -411,22 +478,26 @@ class _GamePanel(QWidget):
             segment.addWidget(button)
             self._section_buttons.append(button)
         segment.addStretch(1)
-        self._section_stack.addWidget(settings_section)
         root.addLayout(segment)
         root.addWidget(self._section_stack, 1)
-        self._select_section(0)
+        self._select_section(self.sections.index("ИГРА"))
 
         root.addStretch(0)
 
     def _ensure_section(self, index: int) -> QWidget:
         page = self._section_pages[index]
         if page is None:
-            if index == 1:
+            title = self.sections[index]
+            if title == SHADOW_SECTION:
+                page = NoShadowsPage(self.profile, show_header=False)
+            elif title == "NVIDIA":
                 page = NvidiaPage(self.profile.key, show_header=False)
-            elif index == 2:
+            elif title == "ЗАПУСК":
                 page = LaunchOptionsPage(self.profile.key, show_header=False)
-            else:
+            elif title == "WINDOWS":
                 page = WinSettingsPage(self.profile.key, show_header=False)
+            else:
+                page = _GameSettingsSection(self.profile)
             self._section_pages[index] = page
             self._section_stack.addWidget(page)
         return page
@@ -439,25 +510,26 @@ class _GamePanel(QWidget):
 
 
 class GamesPage(QWidget):
+    #: сколько плиток в строке сетки
+    COLUMNS = 4
+
     def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__(parent)
         root = QVBoxLayout(self)
         root.setContentsMargins(24, 20, 24, 20)
         root.setSpacing(14)
 
-        root.addWidget(
-            make_header(
-                "Оптимизация игр",
-                "Выберите игру — у каждой есть под-разделы «Игра» (настройки игры с "
-                "пресетами «Макс. производительность / Баланс / Качество», а также блоки "
-                "NVIDIA и параметры запуска Steam), «NVIDIA», «Запуск» и «Windows».",
-            )
+        self._header = make_header(
+            "Оптимизация игр",
+            "Выберите игру: настройки игры, NVIDIA, параметры запуска Steam и Windows. "
+            "У WARDOGS есть ещё вкладка «Убрать тени».",
         )
+        root.addWidget(self._header)
 
         self._stack = QStackedWidget()
         self._grid_index = 0
-        # Панель игры создаётся при первом открытии: так при старте и при смене
-        # темы пересобирается значительно меньше виджетов.
+        # Панель игры создаётся при первом открытии: так при старте пересобирается
+        # значительно меньше виджетов.
         self._panels: dict[int, int] = {}
 
         grid_page = QWidget()
@@ -465,19 +537,66 @@ class GamesPage(QWidget):
         outer.setContentsMargins(0, 0, 0, 0)
         row = QHBoxLayout()
         row.addStretch(1)
-        grid = QGridLayout()
-        grid.setSpacing(20)
+        self._grid = QGridLayout()
+        self._grid.setSpacing(GRID_SPACING)
+        self._tiles: list[_GameTile] = []
+        self._grid_spacing = GRID_SPACING
         for index, profile in enumerate(GAMES):
             tile = _GameTile(profile)
             tile.clicked.connect(lambda idx=index: self._open_game(idx))
-            grid.addWidget(tile, index // 4, index % 4, Qt.AlignCenter)
-        row.addLayout(grid)
+            self._grid.addWidget(tile, index // self.COLUMNS, index % self.COLUMNS)
+            self._tiles.append(tile)
+        row.addLayout(self._grid)
         row.addStretch(1)
         outer.addLayout(row)
         outer.addStretch(1)
         self._stack.addWidget(grid_page)
+        #: текущая ширина плитки — чтобы не пересобирать обложки на каждый пиксель
+        self._tile_width = 0
 
         root.addWidget(self._stack, 1)
+
+    # ------------------------------------------------------------------
+    def resizeEvent(self, event) -> None:  # noqa: N802 - Qt API
+        super().resizeEvent(event)
+        self._relayout()
+
+    def showEvent(self, event) -> None:  # noqa: N802 - Qt API
+        super().showEvent(event)
+        self._relayout()
+
+    def _relayout(self) -> None:
+        """Подбирает размер плиток так, чтобы они занимали доступное место."""
+        if not self._tiles:
+            return
+        margins = self.layout().contentsMargins()
+        columns = self.COLUMNS
+        rows = -(-len(self._tiles) // columns)
+        avail_w = self.width() - margins.left() - margins.right()
+        avail_h = (
+            self.height()
+            - margins.top()
+            - margins.bottom()
+            - self._header.sizeHint().height()
+            - self.layout().spacing()
+            - 16  # небольшой запас, чтобы нижний ряд не упирался в край
+        )
+        # Ширину плитки ограничивают и ширина, и высота окна: нужно уместить
+        # все колонки в ряд и все ряды по высоте.
+        by_width = (avail_w - GRID_SPACING * (columns - 1)) / columns
+        by_height = (avail_h - GRID_SPACING * (rows - 1)) / rows / TILE_RATIO
+        width = int(max(TILE_MIN, min(TILE_MAX, by_width, by_height)))
+        spacing = GRID_SPACING
+        free = avail_w - width * columns
+        if free > 0 and columns > 1:
+            spacing = int(max(GRID_SPACING, min(GRID_SPACING_MAX, free / (columns - 1))))
+        if abs(width - self._tile_width) < 2 and spacing == self._grid_spacing:
+            return
+        self._tile_width = width
+        self._grid_spacing = spacing
+        self._grid.setSpacing(spacing)
+        for tile in self._tiles:
+            tile.set_size(width, int(width * TILE_RATIO))
 
     def _open_game(self, index: int) -> None:
         stack_index = self._panels.get(index)
