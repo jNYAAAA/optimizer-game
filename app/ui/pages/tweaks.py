@@ -56,9 +56,9 @@ class TweaksPage(QWidget):
         root.addWidget(
             make_header(
                 "Твики системы",
-                "Отмеченный флажок — твик применён. Снимите флажок и нажмите "
-                "«Применить изменения», чтобы откатить. Оригинальные значения "
-                "сохраняются автоматически.",
+                "Отмеченный флажок — твик применён. «Применить отмеченные» включает только "
+                "отмеченные и ещё не применённые твики. Чтобы отключить твик, снимите флажок "
+                "и нажмите «Откатить снятые». Оригинальные значения сохраняются автоматически.",
             )
         )
 
@@ -110,7 +110,11 @@ class TweaksPage(QWidget):
         self.deselect_all_btn.clicked.connect(lambda: self._set_all(False))
         controls.addWidget(self.deselect_all_btn)
         controls.addStretch(1)
-        self.apply_btn = QPushButton("ПРИМЕНИТЬ")
+        self.revert_btn = QPushButton("ОТКАТИТЬ СНЯТЫЕ")
+        self.revert_btn.setObjectName("Danger")
+        self.revert_btn.clicked.connect(self._revert)
+        controls.addWidget(self.revert_btn)
+        self.apply_btn = QPushButton("ПРИМЕНИТЬ ОТМЕЧЕННЫЕ")
         self.apply_btn.setObjectName("Primary")
         self.apply_btn.clicked.connect(self._apply)
         controls.addWidget(self.apply_btn)
@@ -210,23 +214,36 @@ class TweaksPage(QWidget):
         for row in range(self.table.rowCount()):
             self.table.item(row, 0).setCheckState(state)
 
-    def _actions(self) -> list[tuple[Tweak, str]]:
+    def _apply_actions(self) -> list[tuple[Tweak, str]]:
+        """Только отмеченные и ещё не применённые твики — остальные не трогаем."""
         actions: list[tuple[Tweak, str]] = []
         for row, tweak in enumerate(self._visible):
-            desired = self.table.item(row, 0).checkState() == Qt.Checked
-            current = self.applied.get(tweak.key, False)
-            if desired and not current:
+            checked = self.table.item(row, 0).checkState() == Qt.Checked
+            if checked and not self.applied.get(tweak.key, False):
                 actions.append((tweak, "apply"))
-            elif not desired and current:
+        return actions
+
+    def _revert_actions(self) -> list[tuple[Tweak, str]]:
+        """Только снятые, но реально применённые твики."""
+        actions: list[tuple[Tweak, str]] = []
+        for row, tweak in enumerate(self._visible):
+            checked = self.table.item(row, 0).checkState() == Qt.Checked
+            if not checked and self.applied.get(tweak.key, False):
                 actions.append((tweak, "revert"))
         return actions
 
     def _apply(self) -> None:
-        actions = self._actions()
+        self._run(self._apply_actions())
+
+    def _revert(self) -> None:
+        self._run(self._revert_actions())
+
+    def _run(self, actions: list[tuple[Tweak, str]]) -> None:
         if not actions:
             self.status.setText("Изменений нет.")
             return
         self.apply_btn.setEnabled(False)
+        self.revert_btn.setEnabled(False)
         self.progress.setValue(0)
 
         def task(progress):
@@ -255,6 +272,7 @@ class TweaksPage(QWidget):
 
     def _on_done(self, results: list[tuple[str, str, bool, str]]) -> None:
         self.apply_btn.setEnabled(True)
+        self.revert_btn.setEnabled(True)
         self.progress.setValue(100)
         failures = 0
         for name, action, ok, message in results:
@@ -277,6 +295,7 @@ class TweaksPage(QWidget):
     def _on_failed(self, message: str) -> None:
         self.refresh_btn.setEnabled(True)
         self.apply_btn.setEnabled(True)
+        self.revert_btn.setEnabled(True)
         self.progress.setRange(0, 100)
         self.progress.setValue(0)
         self.status.setText(f"Ошибка: {message}")

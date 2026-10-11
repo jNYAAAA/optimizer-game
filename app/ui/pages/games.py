@@ -322,40 +322,47 @@ class _GamePanel(QWidget):
         header.addLayout(info, 1)
         root.addLayout(header)
 
+        self._section_stack = QStackedWidget()
+        self._section_buttons: list[QPushButton] = []
         settings_section = _GameSettingsSection(profile)
+        # Под-разделы NVIDIA и Windows создаются только при первом открытии —
+        # это заметно ускоряет запуск и смену темы.
+        self._section_pages: list[QWidget | None] = [settings_section, None, None]
         segment = QHBoxLayout()
         segment.setSpacing(8)
-        stack = QStackedWidget()
-        buttons: list[QPushButton] = []
-        pages: list[QWidget] = [
-            settings_section,
-            NvidiaPage(profile.key, show_header=False),
-            WinSettingsPage(profile.key, show_header=False),
-        ]
         for index, title in enumerate(SECTIONS):
             button = QPushButton(title)
             button.setObjectName("Segment")
             button.setCheckable(True)
             button.setCursor(Qt.PointingHandCursor)
-            button.clicked.connect(
-                lambda _checked=False, idx=index, b=buttons, st=stack: _select_section(b, st, idx)
-            )
+            button.clicked.connect(lambda _checked=False, idx=index: self._select_section(idx))
             segment.addWidget(button)
-            buttons.append(button)
+            self._section_buttons.append(button)
         segment.addStretch(1)
-        for page in pages:
-            stack.addWidget(page)
+        self._section_stack.addWidget(settings_section)
         root.addLayout(segment)
-        root.addWidget(stack, 1)
-        _select_section(buttons, stack, 0)
+        root.addWidget(self._section_stack, 1)
+        self._select_section(0)
 
         root.addStretch(0)
 
+    def _ensure_section(self, index: int) -> QWidget:
+        page = self._section_pages[index]
+        if page is None:
+            page = (
+                NvidiaPage(self.profile.key, show_header=False)
+                if index == 1
+                else WinSettingsPage(self.profile.key, show_header=False)
+            )
+            self._section_pages[index] = page
+            self._section_stack.addWidget(page)
+        return page
 
-def _select_section(buttons: list[QPushButton], stack: QStackedWidget, index: int) -> None:
-    for i, button in enumerate(buttons):
-        button.setChecked(i == index)
-    stack.setCurrentIndex(index)
+    def _select_section(self, index: int) -> None:
+        page = self._ensure_section(index)
+        for i, button in enumerate(self._section_buttons):
+            button.setChecked(i == index)
+        self._section_stack.setCurrentWidget(page)
 
 
 class GamesPage(QWidget):
@@ -374,6 +381,10 @@ class GamesPage(QWidget):
         )
 
         self._stack = QStackedWidget()
+        self._grid_index = 0
+        # Панель игры создаётся при первом открытии: так при старте и при смене
+        # темы пересобирается значительно меньше виджетов.
+        self._panels: dict[int, int] = {}
 
         grid_page = QWidget()
         outer = QVBoxLayout(grid_page)
@@ -384,7 +395,7 @@ class GamesPage(QWidget):
         grid.setSpacing(20)
         for index, profile in enumerate(GAMES):
             tile = _GameTile(profile)
-            tile.clicked.connect(lambda idx=index: self._stack.setCurrentIndex(idx + 1))
+            tile.clicked.connect(lambda idx=index: self._open_game(idx))
             grid.addWidget(tile, index // 4, index % 4, Qt.AlignCenter)
         row.addLayout(grid)
         row.addStretch(1)
@@ -392,9 +403,13 @@ class GamesPage(QWidget):
         outer.addStretch(1)
         self._stack.addWidget(grid_page)
 
-        for profile in GAMES:
-            panel = _GamePanel(profile)
-            panel.back_requested.connect(lambda: self._stack.setCurrentIndex(0))
-            self._stack.addWidget(panel)
-
         root.addWidget(self._stack, 1)
+
+    def _open_game(self, index: int) -> None:
+        stack_index = self._panels.get(index)
+        if stack_index is None:
+            panel = _GamePanel(GAMES[index])
+            panel.back_requested.connect(lambda: self._stack.setCurrentIndex(self._grid_index))
+            stack_index = self._stack.addWidget(panel)
+            self._panels[index] = stack_index
+        self._stack.setCurrentIndex(stack_index)

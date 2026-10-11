@@ -18,14 +18,17 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
+from ...core import nvidia_drs
 from ...core.nvidia import (
     PRESETS,
     PRESETS_BY_KEY,
+    apply_to_driver,
     format_profile,
     load_saved,
     profile_for,
     save_profile,
 )
+from ...core.workers import Worker, start_worker
 from ...core.win_settings import cs2_exe_path
 from ...utils import open_path
 from ..widgets import Card, LogView, OptionRow, make_header
@@ -69,8 +72,10 @@ class NvidiaPage(QWidget):
             root.addWidget(
                 make_header(
                     "Настройки NVIDIA",
-                    "Рекомендованные параметры драйвера для этой игры. Задаются в NVIDIA App / "
-                    "панели управления NVIDIA (программные настройки для .exe игры).",
+                    "Рекомендованные параметры драйвера для этой игры. Кнопка "
+                    "«Применить выбранное» записывает значения прямо в профиль драйвера "
+                    "NVIDIA для .exe игры. Чтобы увидеть изменения в панели управления "
+                    "NVIDIA, закройте и снова откройте её.",
                 )
             )
         else:
@@ -108,10 +113,10 @@ class NvidiaPage(QWidget):
         root.addWidget(card)
 
         controls = QHBoxLayout()
-        apply_btn = QPushButton("ПРИМЕНИТЬ ВЫБРАННОЕ")
-        apply_btn.setObjectName("Primary")
-        apply_btn.clicked.connect(self._apply)
-        controls.addWidget(apply_btn)
+        self.apply_btn = QPushButton("ПРИМЕНИТЬ ВЫБРАННОЕ")
+        self.apply_btn.setObjectName("Primary")
+        self.apply_btn.clicked.connect(self._apply)
+        controls.addWidget(self.apply_btn)
         copy_btn = QPushButton("СКОПИРОВАТЬ СПИСОК")
         copy_btn.clicked.connect(self._copy)
         controls.addWidget(copy_btn)
@@ -161,8 +166,32 @@ class NvidiaPage(QWidget):
     def _apply(self) -> None:
         values = self._values()
         save_profile(self.game_key, values)
-        QGuiApplication.clipboard().setText(format_profile(self.settings, values))
-        self.log.log("Значения сохранены и скопированы в буфер обмена — вставьте в NVIDIA App.")
+        self.apply_btn.setEnabled(False)
+        self.log.log("Применение настроек в профиль драйвера NVIDIA…")
+        worker = Worker(apply_to_driver, self.game_key, values)
+        worker.signals.finished.connect(self._on_applied)
+        worker.signals.failed.connect(self._on_apply_failed)
+        start_worker(worker)
+
+    def _on_applied(self, result: tuple[bool, str]) -> None:
+        self.apply_btn.setEnabled(True)
+        ok, message = result
+        self.log.log(message)
+        if ok:
+            self.log.log(
+                "Готово. Чтобы увидеть значения в панели управления NVIDIA, "
+                "закройте и снова откройте её."
+            )
+        else:
+            self.log.log("Часть настроек применить не удалось.")
+            if not nvidia_drs.available():
+                self.log.log(
+                    "NVAPI недоступен: нужна видеокарта NVIDIA с установленным драйвером."
+                )
+
+    def _on_apply_failed(self, message: str) -> None:
+        self.apply_btn.setEnabled(True)
+        self.log.log(f"Не удалось применить настройки NVIDIA: {message}")
 
     def _on_help(self, text: str) -> None:
         self.help_label.setText(

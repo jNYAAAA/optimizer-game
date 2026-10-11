@@ -201,3 +201,86 @@ def format_profile(settings: list[NvidiaSetting], values: dict[str, str]) -> str
         label = dict(setting.options).get(value, value)
         lines.append(f"{setting.name}: {label}")
     return "\n".join(lines)
+
+
+# ---------------------------------------------------------------------------
+# Применение к драйверу NVIDIA (NVAPI / DRS)
+# ---------------------------------------------------------------------------
+# Ключ интерфейса -> (идентификатор настройки драйвера, {значение: dword}).
+_DRS_SETTINGS: dict[str, tuple[int, dict[str, int]]] = {
+    "image_scaling": (0x10444444, {"off": 0x00000000, "on": 0x00000001}),
+    "low_latency": (0x0005F543, {"off": 0x00000000, "on": 0x00000001, "ultra": 0x00000002}),
+    "power": (0x1057EB71, {"adaptive": 0x00000000, "max": 0x00000001, "optimal": 0x00000005}),
+    "tex_quality": (
+        0x00CE2691,
+        {
+            "quality": 0x00000000,
+            "perf": 0x0000000A,
+            "highperf": 0x00000014,
+            "highquality": 0xFFFFFFF6,
+        },
+    ),
+    "neg_lod": (0x0019BB68, {"allow": 0x00000000, "clamp": 0x00000001}),
+    "aniso_sample": (0x00E73211, {"off": 0x00000000, "on": 0x00000001}),
+    # У настройки драйвера инвертированные значения: «Вкл» = 0, «Выкл» = 1.
+    "trilinear": (0x002ECAF2, {"on": 0x00000000, "off": 0x00000001}),
+    "threaded": (0x20C1221E, {"auto": 0x00000000, "on": 0x00000001, "off": 0x00000002}),
+    "vsync": (0x00A879CF, {"off": 0x08416747, "on": 0x47814940, "app": 0x60925292}),
+    "refresh": (0x0064B541, {"highest": 0x00000001, "app": 0x00000000}),
+    "shader_cache": (
+        0x00AC8497,
+        {"off": 0x00000000, "1": 0x00000400, "5": 0x00001400, "10": 0x00002800,
+         "unlimited": 0xFFFFFFFF},
+    ),
+    "max_fps": (
+        0x10835002,
+        {"off": 0, "237": 237, "141": 141, "117": 117, "60": 60},
+    ),
+    "bg_fps": (0x10835005, {"off": 0, "30": 30, "60": 60}),
+    "present": (0x20D690F8, {"layered": 0x00000001, "auto": 0x00000002, "disabled": 0x00000000}),
+}
+
+# Настройки, которые нельзя задать в профиле игры (управляются глобально) —
+# выводим понятные названия вместо технических ключей.
+_UNSUPPORTED_NAMES = {
+    "monitor": "Технология монитора (настраивается в разделе «Настройка G-SYNC»)",
+}
+
+
+def drs_pairs(values: dict[str, str]) -> tuple[list[tuple[int, int]], list[str]]:
+    """Преобразует выбранные значения в пары (id настройки драйвера, dword)."""
+    pairs: list[tuple[int, int]] = []
+    unsupported: list[str] = []
+    for key, raw in values.items():
+        mapping = _DRS_SETTINGS.get(key)
+        if mapping is None:
+            unsupported.append(_UNSUPPORTED_NAMES.get(key, key))
+            continue
+        if raw in mapping[1]:
+            pairs.append((mapping[0], mapping[1][raw]))
+    return pairs, unsupported
+
+
+def apply_to_driver(game_key: str, values: dict[str, str]) -> tuple[bool, str]:
+    """Записывает выбранные значения в профиль драйвера NVIDIA для игры."""
+    from . import nvidia_drs
+    from .games import GAMES_BY_KEY
+    from .win_settings import game_exe_path
+
+    exe = game_exe_path(game_key)
+    if not exe:
+        return False, (
+            "Исполняемый файл игры не найден — профиль драйвера создаётся для "
+            "конкретной игры. Установите игру и повторите."
+        )
+    pairs, unsupported = drs_pairs(values)
+    if not pairs:
+        return False, "Нет настроек, которые можно применить к драйверу."
+
+    profile = GAMES_BY_KEY.get(game_key)
+    friendly = profile.name if profile is not None else game_key
+    ok, messages = nvidia_drs.apply_profile(exe, friendly, pairs)
+    text = " ".join(messages)
+    if unsupported:
+        text += " Настраивается вручную: " + "; ".join(unsupported) + "."
+    return ok, text.strip()

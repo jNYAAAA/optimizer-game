@@ -127,6 +127,7 @@ class DashboardPage(QWidget):
 
         # Датчики опрашиваются реже и только пока страница видима.
         self._sensors_busy = False
+        self._sensor_readings: list[SensorReading] = []
         self._sensors_timer = QTimer(self)
         self._sensors_timer.setInterval(6000)
         self._sensors_timer.timeout.connect(self._refresh_sensors)
@@ -144,7 +145,11 @@ class DashboardPage(QWidget):
         super().hideEvent(event)
 
     def on_theme_changed(self) -> None:
-        self._refresh_sensors()
+        # Перерисовываем уже прочитанные датчики в новых цветах, не опрашивая их заново.
+        if self._sensor_readings:
+            self._render_sensors()
+        else:
+            self._refresh_sensors()
 
     def load(self) -> None:
         self.status.setText("Сбор данных о системе…")
@@ -291,8 +296,13 @@ class DashboardPage(QWidget):
 
     def _on_sensors(self, readings: list[SensorReading]) -> None:
         self._sensors_busy = False
+        self._sensor_readings = readings
+        self._render_sensors()
+
+    def _render_sensors(self) -> None:
         card = self.sensors_card
         card.clear()
+        readings = self._sensor_readings
         if not readings:
             card.add_row("Статус", "Датчики не найдены.")
             return
@@ -313,6 +323,7 @@ class DashboardPage(QWidget):
 
     def _on_sensors_failed(self, message: str) -> None:
         self._sensors_busy = False
+        self._sensor_readings = []
         self.sensors_card.clear()
         self.sensors_card.add_row("Статус", f"Не удалось прочитать датчики: {message}")
 
