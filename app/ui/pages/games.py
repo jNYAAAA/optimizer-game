@@ -35,13 +35,14 @@ from ...core.workers import Worker, start_worker
 from ...utils import resource_path
 from .. import theme
 from ..widgets import Card, InfoIcon, LogView, make_header
+from .launch import LaunchOptionsPage
 from .nvidia import NvidiaPage
 from .win_settings import WinSettingsPage
 
 COVER_W, COVER_H = 155, 232
 
 # Под-разделы экрана игры.
-SECTIONS = ["ИГРА", "NVIDIA", "WINDOWS"]
+SECTIONS = ["ИГРА", "NVIDIA", "ЗАПУСК", "WINDOWS"]
 
 
 def _cover_pixmap(profile: GameProfile, width: int, height: int) -> QPixmap:
@@ -203,6 +204,17 @@ class _GameSettingsSection(QWidget):
         self.log = LogView()
         self.log.setMaximumHeight(90)
         root.addWidget(self.log)
+
+        # Блоки NVIDIA и параметров запуска собраны в этом же разделе, чтобы всё
+        # нужное для игры было в одном месте. Создаются при первом показе
+        # раздела — так открытие панели и смена темы остаются быстрыми.
+        self.extras = QVBoxLayout()
+        self.extras.setContentsMargins(0, 0, 0, 0)
+        self.extras.setSpacing(14)
+        root.addLayout(self.extras)
+        self.extra_pages: list[QWidget] = []
+        self._extras_built = False
+
         root.addStretch(1)
 
         self._loaded = False
@@ -211,7 +223,20 @@ class _GameSettingsSection(QWidget):
         super().showEvent(event)
         if not self._loaded:
             self._loaded = True
+            self._build_extras()
             self.refresh()
+
+    def _build_extras(self) -> None:
+        """Добавляет в раздел «Игра» блоки NVIDIA и параметров запуска."""
+        if self._extras_built:
+            return
+        self._extras_built = True
+        for page in (
+            NvidiaPage(self.profile.key, show_header=False),
+            LaunchOptionsPage(self.profile.key, show_header=False),
+        ):
+            self.extra_pages.append(page)
+            self.extras.addWidget(page)
 
     def _on_help(self, text: str) -> None:
         self.help_label.setText(
@@ -360,7 +385,8 @@ class _GamePanel(QWidget):
         name.setObjectName("PageTitle")
         info.addWidget(name)
         caption = QLabel(
-            f"{len(profile.settings)} настроек · профиль «максимум FPS без потери качества»"
+            f"{len(profile.settings)} настроек игры · ниже в этом же разделе — "
+            "параметры NVIDIA и запуска Steam"
         )
         caption.setObjectName("Caption")
         info.addWidget(caption)
@@ -371,9 +397,9 @@ class _GamePanel(QWidget):
         self._section_stack = QStackedWidget()
         self._section_buttons: list[QPushButton] = []
         settings_section = _GameSettingsSection(profile)
-        # Под-разделы NVIDIA и Windows создаются только при первом открытии —
+        # Под-разделы создаются только при первом открытии —
         # это заметно ускоряет запуск и смену темы.
-        self._section_pages: list[QWidget | None] = [settings_section, None, None]
+        self._section_pages: list[QWidget | None] = [settings_section, None, None, None]
         segment = QHBoxLayout()
         segment.setSpacing(8)
         for index, title in enumerate(SECTIONS):
@@ -395,11 +421,12 @@ class _GamePanel(QWidget):
     def _ensure_section(self, index: int) -> QWidget:
         page = self._section_pages[index]
         if page is None:
-            page = (
-                NvidiaPage(self.profile.key, show_header=False)
-                if index == 1
-                else WinSettingsPage(self.profile.key, show_header=False)
-            )
+            if index == 1:
+                page = NvidiaPage(self.profile.key, show_header=False)
+            elif index == 2:
+                page = LaunchOptionsPage(self.profile.key, show_header=False)
+            else:
+                page = WinSettingsPage(self.profile.key, show_header=False)
             self._section_pages[index] = page
             self._section_stack.addWidget(page)
         return page
@@ -422,8 +449,8 @@ class GamesPage(QWidget):
             make_header(
                 "Оптимизация игр",
                 "Выберите игру — у каждой есть под-разделы «Игра» (настройки игры с "
-                "пресетами «Макс. производительность / Баланс / Качество»), «NVIDIA» и "
-                "«Windows».",
+                "пресетами «Макс. производительность / Баланс / Качество», а также блоки "
+                "NVIDIA и параметры запуска Steam), «NVIDIA», «Запуск» и «Windows».",
             )
         )
 

@@ -101,6 +101,11 @@ NVIDIA_PROFILES: dict[str, list[NvidiaSetting]] = {
     "squad": _settings({**_COMMON, "low_latency": "on", "power": "max", "tex_quality": "highperf", "max_fps": "141"}),
     "dayz": _settings({**_COMMON, "low_latency": "on", "power": "max", "tex_quality": "highperf", "max_fps": "off"}),
     "gtav": _settings({**_COMMON, "low_latency": "on", "power": "max", "tex_quality": "highperf", "max_fps": "off"}),
+    # В WARDOGS есть встроенный NVIDIA Reflex, поэтому режим низкой задержки в
+    # драйвере выключен, чтобы настройки не конфликтовали.
+    "wardogs": _settings(
+        {**_COMMON, "low_latency": "off", "power": "max", "tex_quality": "highperf", "max_fps": "off"}
+    ),
 }
 
 

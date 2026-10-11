@@ -3,7 +3,10 @@
 Поддерживаются файлы двух видов:
 
 * VDF-подобные (CS2, Dota 2, Apex Legends) — ``"key" "value"`` внутри блока;
-* UE ini (PUBG) — секции ``[Section]`` и строки ``Key=Value``.
+* UE ini (PUBG, Squad, WARDOGS) — секции ``[Section]`` и строки ``Key=Value``.
+
+У WARDOGS файл ``GameUserSettings.ini`` содержит группы масштабируемости
+``[ScalabilityGroups]`` (``sg.*``) и настройки игры ``[/Script/WDGame.WDUserSettings]``.
 
 У каждой настройки есть рекомендованное значение, список допустимых вариантов и
 пояснение. Перед изменением каждый файл копируется в папку данных приложения.
@@ -24,6 +27,17 @@ from ..config import app_data_dir
 BACKUP_DIRNAME = "game_backup"
 
 _ON_OFF = [("0", "Выкл"), ("1", "Вкл")]
+
+# Уровни групп масштабируемости Unreal Engine (0 — минимум, 3 — максимум).
+_UE_QUALITY = [
+    ("0", "Минимум (Potato)"),
+    ("1", "Низкое"),
+    ("2", "Среднее"),
+    ("3", "Высокое"),
+]
+
+# В WARDOGS у групп качества есть дополнительный уровень 4 («Overkill»).
+_UE_QUALITY_MAX = list(_UE_QUALITY) + [("4", "Ультра (Overkill)")]
 
 _GTAV_TEMPLATE = """<?xml version="1.0" encoding="UTF-8"?>
 <Settings>
@@ -602,7 +616,228 @@ GAMES: list[GameProfile] = [
         logo="games/wardogs-cover.png",
         kind="ini",
         locator="wardogs",
-        settings=[],
+        settings=[
+            # --- Группы масштабируемости (секция ScalabilityGroups) ---
+            Setting(
+                "sg.ResolutionQuality", "100.000000", "Масштаб разрешения рендера",
+                "ScalabilityGroups",
+                help="Разрешение рендера. 100% — чёткость; ниже — больше FPS, но хуже видимость "
+                "на дистанции. Сначала используйте DLSS/FSR, а не этот параметр.",
+                options=[("100.000000", "100%"), ("90.000000", "90%"), ("85.000000", "85%"),
+                         ("80.000000", "80%"), ("70.000000", "70%")],
+            ),
+            Setting(
+                "sg.ViewDistanceQuality", "2", "Дальность прорисовки", "ScalabilityGroups",
+                help="Как далеко видны объекты и игроки. Резать в последнюю очередь — от него "
+                "сильнее всего зависит, заметите ли вы противника на открытой местности.",
+                options=list(_UE_QUALITY_MAX),
+            ),
+            Setting(
+                "sg.MeshQuality", "2", "Детализация моделей", "ScalabilityGroups",
+                help="Геометрия персонажей и мира. Среднее — читаемые силуэты без лишней нагрузки.",
+                options=list(_UE_QUALITY_MAX),
+            ),
+            Setting(
+                "sg.ShadingQuality", "1", "Качество затенения", "ScalabilityGroups",
+                help="Сложность шейдинга. Низкое почти не влияет на картинку в бою.",
+                options=list(_UE_QUALITY_MAX),
+            ),
+            Setting(
+                "sg.ShadowQuality", "1", "Тени", "ScalabilityGroups",
+                help="Качество теней. Низкое/среднее даёт заметный прирост FPS; 4 — максимальный "
+                "уровень («Overkill»).",
+                options=list(_UE_QUALITY_MAX),
+            ),
+            Setting(
+                "sg.GlobalIlluminationQuality", "0", "Глобальное освещение", "ScalabilityGroups",
+                help="Один из самых дорогих параметров. Выключение даёт ощутимый прирост FPS.",
+                options=list(_UE_QUALITY_MAX),
+            ),
+            Setting(
+                "sg.ReflectionQuality", "0", "Отражения", "ScalabilityGroups",
+                help="Отражения почти не важны в перестрелках — простая жертва ради FPS.",
+                options=list(_UE_QUALITY_MAX),
+            ),
+            Setting(
+                "sg.PostProcessQuality", "1", "Постобработка", "ScalabilityGroups",
+                help="Эффекты постобработки. Низкое — компромисс между FPS и картинкой.",
+                options=list(_UE_QUALITY_MAX),
+            ),
+            Setting(
+                "sg.EffectsQuality", "0", "Эффекты", "ScalabilityGroups",
+                help="Взрывы, дым, разрушения. В массовых боях сильно нагружает систему.",
+                options=list(_UE_QUALITY_MAX),
+            ),
+            Setting(
+                "sg.ParticleSpawnRateQuality", "0", "Количество частиц", "ScalabilityGroups",
+                help="Плотность частиц. Низкое значение помогает удержать FPS у зоны контроля.",
+                options=list(_UE_QUALITY_MAX),
+            ),
+            Setting(
+                "sg.FoliageQuality", "0", "Растительность", "ScalabilityGroups",
+                help="Трава и листва. Низкое качество ещё и улучшает видимость противников.",
+                options=list(_UE_QUALITY_MAX),
+            ),
+            Setting(
+                "sg.LandscapeQuality", "1", "Ландшафт", "ScalabilityGroups",
+                help="Детализация рельефа и грунта.",
+                options=list(_UE_QUALITY_MAX),
+            ),
+            Setting(
+                "sg.AntiAliasingQuality", "2", "Сглаживание (без DLSS/FSR)", "ScalabilityGroups",
+                help="Сглаживание краёв. Если включён DLSS или FSR, влияние невелико.",
+                options=list(_UE_QUALITY_MAX),
+            ),
+            Setting(
+                "sg.TextureQuality", "2", "Текстуры", "ScalabilityGroups",
+                help="Общее качество текстур. Влияет на VRAM сильнее, чем на FPS.",
+                options=list(_UE_QUALITY_MAX),
+            ),
+            Setting(
+                "sg.WorldTextureQuality", "2", "Текстуры мира", "ScalabilityGroups",
+                help="Качество текстур мира. При 8 ГБ VRAM и меньше ставьте низкое.",
+                options=list(_UE_QUALITY_MAX),
+            ),
+            Setting(
+                "sg.CharacterTextureQuality", "2", "Текстуры персонажей", "ScalabilityGroups",
+                help="Качество текстур персонажей — важно для их заметности.",
+                options=list(_UE_QUALITY_MAX),
+            ),
+            Setting(
+                "sg.EffectsTextureQuality", "1", "Текстуры эффектов", "ScalabilityGroups",
+                help="Текстуры эффектов. Можно держать ниже остальных.",
+                options=list(_UE_QUALITY_MAX),
+            ),
+            Setting(
+                "sg.TextureFilteringQuality", "2", "Фильтрация текстур", "ScalabilityGroups",
+                help="Чёткость текстур под углом. Среднее — хороший баланс.",
+                options=list(_UE_QUALITY_MAX),
+            ),
+            Setting(
+                "sg.MotionBlurQuality", "0", "Размытие в движении", "ScalabilityGroups",
+                help="Смазывает картинку при повороте камеры — мешает целиться.",
+                options=list(_UE_QUALITY),
+            ),
+            Setting(
+                "sg.DepthOfFieldQuality", "0", "Глубина резкости", "ScalabilityGroups",
+                help="Размытие фона. Мешает обзору и стоит FPS.",
+                options=list(_UE_QUALITY),
+            ),
+            Setting(
+                "sg.LensFlareQuality", "0", "Блики объектива", "ScalabilityGroups",
+                help="Визуальный шум вокруг источников света.",
+                options=list(_UE_QUALITY),
+            ),
+            Setting(
+                "sg.BloomQuality", "0", "Свечение (Bloom)", "ScalabilityGroups",
+                help="«Мыльный» ореол вокруг ярких объектов.",
+                options=list(_UE_QUALITY),
+            ),
+            # --- Настройки самой игры (секция WDUserSettings) ---
+            Setting(
+                "NvidiaDLSSMode", "4", "NVIDIA DLSS", "/Script/WDGame.WDUserSettings",
+                help="Апскейл NVIDIA: Quality — лучший баланс чёткости и FPS. 0 — выключить "
+                "(игра использует TAA). Геометрию режимов сверяйте с меню игры.",
+                options=[("0", "Выкл (TAA)"), ("4", "Качество"), ("5", "Баланс"),
+                         ("6", "Производительность")],
+            ),
+            Setting(
+                "FSR3QualityMode", "1", "AMD FSR 3", "/Script/WDGame.WDUserSettings",
+                help="Апскейл для видеокарт AMD и старых NVIDIA. 0 — выключить. "
+                "Не используйте «Производительность»: цели вдали станут неразличимы.",
+                options=[("0", "Выкл (TAA)"), ("1", "Качество"), ("2", "Баланс"),
+                         ("3", "Производительность")],
+            ),
+            Setting(
+                "NvidiaDLSSGMode", "0", "Генерация кадров (Frame Generation)",
+                "/Script/WDGame.WDUserSettings",
+                help="Не поднимает базовый FPS и добавляет задержку — для соревновательной "
+                "игры лучше выключить.",
+                options=list(_ON_OFF),
+            ),
+            Setting(
+                "NvidiaReflexMode", "1", "NVIDIA Reflex", "/Script/WDGame.WDUserSettings",
+                help="Снижает задержку ввода. «Boost» не даёт GPU сбрасывать частоты.",
+                options=[("0", "Выкл"), ("1", "Вкл"), ("2", "Вкл + Boost")],
+            ),
+            Setting(
+                "bUseVSync", "False", "Вертикальная синхронизация",
+                "/Script/WDGame.WDUserSettings",
+                help="Привязка кадров к частоте монитора — добавляет задержку ввода.",
+                options=[("False", "Выкл"), ("True", "Вкл")],
+            ),
+            Setting(
+                "bUseDynamicResolution", "False", "Динамическое разрешение",
+                "/Script/WDGame.WDUserSettings",
+                help="Игра сама меняет разрешение под нагрузкой — картинка «плывёт».",
+                options=[("False", "Выкл"), ("True", "Вкл")],
+            ),
+            Setting(
+                "FrameRateLimit", "0.000000", "Ограничение FPS",
+                "/Script/WDGame.WDUserSettings",
+                help="0 — без ограничений. Если фреймтайм неровный, поставьте частоту монитора "
+                "или стабильный FPS.",
+                options=[("0.000000", "Без ограничений"), ("60.000000", "60"),
+                         ("120.000000", "120"), ("141.000000", "141"),
+                         ("144.000000", "144"), ("240.000000", "240")],
+            ),
+            Setting(
+                "FullscreenMode", "1", "Режим экрана", "/Script/WDGame.WDUserSettings",
+                help="Полноэкранный режим обычно даёт минимальную задержку ввода.",
+                options=[("0", "Полноэкранный"), ("1", "Полноэкранный в окне"),
+                         ("2", "Оконный")],
+            ),
+            Setting(
+                "FieldOfView", "95.000000", "Угол обзора (FOV)",
+                "/Script/WDGame.WDUserSettings",
+                help="95–100 — оптимально для WARDOGS. Слишком большой FOV уменьшает цели "
+                "на дистанции.",
+                options=[("90.000000", "90"), ("95.000000", "95"), ("100.000000", "100"),
+                         ("110.000000", "110"), ("120.000000", "120")],
+            ),
+            Setting(
+                "bUseMotionBlur", "False", "Размытие в движении",
+                "/Script/WDGame.WDUserSettings",
+                help="Полное отключение эффекта.",
+                options=[("False", "Выкл"), ("True", "Вкл")],
+            ),
+            Setting(
+                "bUseDepthOfField", "False", "Глубина резкости",
+                "/Script/WDGame.WDUserSettings",
+                help="Полное отключение эффекта.",
+                options=[("False", "Выкл"), ("True", "Вкл")],
+            ),
+            Setting(
+                "bUseLensFlare", "False", "Блики объектива",
+                "/Script/WDGame.WDUserSettings",
+                help="Полное отключение эффекта.",
+                options=[("False", "Выкл"), ("True", "Вкл")],
+            ),
+            Setting(
+                "bUseBloom", "False", "Свечение (Bloom)",
+                "/Script/WDGame.WDUserSettings",
+                help="Полное отключение эффекта.",
+                options=[("False", "Выкл"), ("True", "Вкл")],
+            ),
+            Setting(
+                "bIsPictureInPictureScopeEnabled", "False", "Отдельный рендеринг в прицеле (PIP)",
+                "/Script/WDGame.WDUserSettings",
+                help="Картинка в картинке внутри оптики. Отключение даёт заметный прирост FPS.",
+                options=[("False", "Выкл"), ("True", "Вкл")],
+            ),
+            Setting(
+                "bTinnitusAudioEnabled", "False", "Звон в ушах после взрывов",
+                "/Script/WDGame.WDUserSettings",
+                help="Эффект звона мешает слышать окружение после близких взрывов.",
+                options=[("False", "Выкл"), ("True", "Вкл")],
+            ),
+            Setting(
+                "bIsSpatialAudioEnabled", "True", "Пространственный 3D-звук",
+                "/Script/WDGame.WDUserSettings",
+                help="Позволяет определять направление шагов и стрельбы.",
+                options=[("True", "Вкл"), ("False", "Выкл")],
+            ),
+        ],
     ),
 ]
 
@@ -690,6 +925,28 @@ _PRESET_OVERRIDES: dict[str, dict[str, tuple[str, str]]] = {
         "WaterQuality": ("", "2"),
         "GrassQuality": ("", "3"),
         "Tessellation": ("2", "3"),
+    },
+    "wardogs": {
+        "sg.ViewDistanceQuality": ("3", "3"),
+        "sg.MeshQuality": ("3", "3"),
+        "sg.ShadingQuality": ("2", "3"),
+        "sg.ShadowQuality": ("2", "4"),
+        "sg.GlobalIlluminationQuality": ("1", "2"),
+        "sg.ReflectionQuality": ("1", "2"),
+        "sg.PostProcessQuality": ("2", "3"),
+        "sg.EffectsQuality": ("1", "3"),
+        "sg.ParticleSpawnRateQuality": ("1", "3"),
+        "sg.FoliageQuality": ("1", "2"),
+        "sg.LandscapeQuality": ("2", "3"),
+        "sg.AntiAliasingQuality": ("3", "3"),
+        "sg.TextureQuality": ("3", "3"),
+        "sg.WorldTextureQuality": ("3", "3"),
+        "sg.CharacterTextureQuality": ("3", "3"),
+        "sg.EffectsTextureQuality": ("2", "3"),
+        "sg.TextureFilteringQuality": ("3", "3"),
+        "sg.BloomQuality": ("1", "2"),
+        "sg.LensFlareQuality": ("1", "2"),
+        "sg.DepthOfFieldQuality": ("1", "1"),
     },
 }
 
@@ -799,6 +1056,13 @@ def _locate(profile: GameProfile) -> list[Path]:
         return [candidate] if candidate.is_file() else []
     if locator == "dayz":
         candidate = Path(os.environ.get("USERPROFILE", "")) / "Documents" / "DayZ" / "DayZ.cfg"
+        return [candidate] if candidate.is_file() else []
+    if locator == "wardogs":
+        base = (
+            Path(os.environ.get("LOCALAPPDATA", ""))
+            / "Wardogs" / "Saved" / "Config" / "WindowsClient"
+        )
+        candidate = base / "GameUserSettings.ini"
         return [candidate] if candidate.is_file() else []
     if locator == "gtav":
         candidate = (

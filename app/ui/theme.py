@@ -9,11 +9,16 @@ import os
 
 from ..utils import resource_path
 
-FONT = '"Segoe UI Variable Text", "Segoe UI", "Verdana", sans-serif'
+FONT = '"Segoe UI Variable Text", "Segoe UI", "Bahnschrift", "Verdana", sans-serif'
+FONT_TITLE = '"Bahnschrift SemiBold", "Bahnschrift", "Segoe UI Variable Display", "Segoe UI", sans-serif'
+FONT_MONO = '"Cascadia Mono", "Consolas", "Courier New", monospace'
 
 LIGHT = {
     "NAME": "light",
     "MONO": FONT,
+    "FONT": FONT,
+    "FONT_TITLE": FONT_TITLE,
+    "FONT_MONO": FONT_MONO,
     "BG": "#f3f3f3",
     "BG_ALT": "#ececec",
     "PANEL": "#ffffff",
@@ -36,13 +41,16 @@ LIGHT = {
 DARK = {
     "NAME": "dark",
     "MONO": FONT,
-    "BG": "#202020",
-    "BG_ALT": "#1c1c1c",
-    "PANEL": "#2b2b2b",
-    "BORDER": "#3d3d3d",
-    "CONTROL": "#2d2d2d",
-    "CONTROL_HOVER": "#333333",
-    "CONTROL_PRESSED": "#292929",
+    "FONT": FONT,
+    "FONT_TITLE": FONT_TITLE,
+    "FONT_MONO": FONT_MONO,
+    "BG": "#1c2026",
+    "BG_ALT": "rgba(38, 44, 52, 0.55)",
+    "PANEL": "rgba(46, 52, 61, 0.72)",
+    "BORDER": "rgba(120, 135, 155, 0.28)",
+    "CONTROL": "rgba(46, 52, 61, 0.66)",
+    "CONTROL_HOVER": "rgba(58, 66, 78, 0.72)",
+    "CONTROL_PRESSED": "rgba(40, 46, 54, 0.8)",
     "ACCENT": "#60cdff",
     "ACCENT_DIM": "#4cc2ff",
     "MAGENTA": "#ff2e97",
@@ -93,7 +101,7 @@ def _check_icon(dark: bool) -> str:
 
 _TEMPLATE = """
     * {{
-        font-family: {MONO};
+        font-family: {FONT};
         font-size: 13px;
         color: {TEXT};
     }}
@@ -115,6 +123,7 @@ _TEMPLATE = """
         border-right: 1px solid {BORDER};
     }}
     QLabel#AppTitle {{
+        font-family: {FONT_TITLE};
         font-size: 15px;
         font-weight: 600;
         color: {TEXT};
@@ -126,6 +135,7 @@ _TEMPLATE = """
         padding: 10px 8px 12px 8px;
     }}
     QLabel#PageTitle {{
+        font-family: {FONT_TITLE};
         font-size: 22px;
         font-weight: 600;
         color: {TEXT};
@@ -184,6 +194,7 @@ _TEMPLATE = """
         border-radius: 8px;
     }}
     QFrame#Card QLabel#CardTitle {{
+        font-family: {FONT_TITLE};
         color: {TEXT};
         font-size: 13px;
         font-weight: 600;
@@ -202,6 +213,7 @@ _TEMPLATE = """
         border-radius: 5px;
         padding: 7px 16px;
         color: {TEXT};
+        font-family: {FONT_TITLE};
         min-height: 18px;
     }}
     QPushButton:hover {{
@@ -359,6 +371,7 @@ _TEMPLATE = """
         border-bottom: 1px solid {BORDER};
         padding: 8px;
         color: {TEXT_DIM};
+        font-family: {FONT_TITLE};
         font-weight: 600;
     }}
 
@@ -368,6 +381,7 @@ _TEMPLATE = """
         border-radius: 6px;
         padding: 8px;
         color: {TEXT_DIM};
+        font-family: {FONT_MONO};
         font-size: 12px;
     }}
 
