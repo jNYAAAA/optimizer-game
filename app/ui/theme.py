@@ -101,11 +101,11 @@ _TEMPLATE = """
         background: {BG};
     }}
     QScrollArea {{
-        background: {BG};
+        background: transparent;
         border: none;
     }}
     QScrollArea > QWidget {{
-        background: {BG};
+        background: transparent;
     }}
     QScrollArea > QWidget > QWidget {{
         background: transparent;

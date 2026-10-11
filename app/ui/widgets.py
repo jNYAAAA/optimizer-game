@@ -4,7 +4,17 @@ from __future__ import annotations
 from datetime import datetime
 
 from PySide6.QtCore import QRectF, Qt, Signal
-from PySide6.QtGui import QColor, QCursor, QIcon, QPainter, QPainterPath, QPen, QPixmap
+from PySide6.QtGui import (
+    QBrush,
+    QColor,
+    QCursor,
+    QIcon,
+    QPainter,
+    QPainterPath,
+    QPen,
+    QPixmap,
+    QRadialGradient,
+)
 from PySide6.QtWidgets import (
     QAbstractButton,
     QComboBox,
@@ -111,6 +121,59 @@ class Card(QFrame):
             if widget is not None:
                 widget.deleteLater()
         self._rows.clear()
+
+
+class Backdrop(QWidget):
+    """Фон приложения: базовый цвет и лёгкий киберпанк-узор (сетка и свечение)."""
+
+    def paintEvent(self, event) -> None:  # noqa: N802 - Qt API
+        colors = theme.palette()
+        painter = QPainter(self)
+        rect = self.rect()
+        painter.fillRect(rect, QColor(colors["BG"]))
+
+        # Мягкое свечение акцентом в правом верхнем углу.
+        glow = QRadialGradient(
+            rect.width() * 0.85, -rect.height() * 0.15, max(rect.width(), rect.height()) * 0.9
+        )
+        inner = QColor(colors["ACCENT"])
+        inner.setAlpha(30)
+        outer = QColor(colors["ACCENT"])
+        outer.setAlpha(0)
+        glow.setColorAt(0.0, inner)
+        glow.setColorAt(1.0, outer)
+        painter.fillRect(rect, QBrush(glow))
+
+        # Сетка: тонкие линии и акцентная линия каждые четыре клетки.
+        step = 34
+        line = QColor(colors["BORDER"])
+        line.setAlpha(70)
+        accent = QColor(colors["ACCENT"])
+        accent.setAlpha(36)
+        painter.setPen(QPen(line, 1))
+        for x in range(0, rect.width() + 1, step):
+            if (x // step) % 4 == 0:
+                continue
+            painter.drawLine(x, 0, x, rect.height())
+        for y in range(0, rect.height() + 1, step):
+            if (y // step) % 4 == 0:
+                continue
+            painter.drawLine(0, y, rect.width(), y)
+        painter.setPen(QPen(accent, 1))
+        for x in range(0, rect.width() + 1, step * 4):
+            painter.drawLine(x, 0, x, rect.height())
+        for y in range(0, rect.height() + 1, step * 4):
+            painter.drawLine(0, y, rect.width(), y)
+
+        # Редкие «узлы» на пересечениях — как на печатной плате.
+        node = QColor(colors["ACCENT"])
+        node.setAlpha(60)
+        painter.setPen(Qt.NoPen)
+        painter.setBrush(node)
+        for x in range(0, rect.width() + 1, step * 4):
+            for y in range(0, rect.height() + 1, step * 4):
+                painter.drawRect(x - 1, y - 1, 3, 3)
+        painter.end()
 
 
 class LogView(QPlainTextEdit):

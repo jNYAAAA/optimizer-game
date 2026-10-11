@@ -35,7 +35,7 @@ from .pages.optimize import OptimizePage
 from .pages.settings import SettingsPage
 from .pages.tweaks import TweaksPage
 from .splash import SplashScreen
-from .widgets import ThemeToggleButton, nav_icon, scrollable
+from .widgets import Backdrop, ThemeToggleButton, nav_icon, scrollable
 
 
 class MainWindow(QMainWindow):
@@ -44,8 +44,9 @@ class MainWindow(QMainWindow):
         self.setWindowTitle(f"{APP_DISPLAY_NAME} {APP_VERSION}")
         self.resize(1200, 800)
 
-        root = QWidget()
+        root = Backdrop()
         root.setObjectName("Root")
+        self.backdrop = root
         self.setCentralWidget(root)
         layout = QHBoxLayout(root)
         layout.setContentsMargins(0, 0, 0, 0)
@@ -142,6 +143,7 @@ class MainWindow(QMainWindow):
         if app is not None:
             app.setStyleSheet(theme.styles())
         self._update_theme_button()
+        self.backdrop.update()
         for _name, page in self.pages:
             hook = getattr(page, "on_theme_changed", None)
             if callable(hook):
