@@ -9,6 +9,7 @@ from __future__ import annotations
 import os
 import re
 from dataclasses import dataclass
+from pathlib import Path
 from typing import Callable
 
 from . import registry
@@ -39,6 +40,29 @@ _GAME_EXE = {
     "dayz": ["DayZ/DayZ_x64.exe"],
     "gtav": ["Grand Theft Auto V/GTA5.exe"],
     "wardogs": ["Wardogs/Wardogs/Binaries/Win64/WardogsClient-Win64-Shipping.exe"],
+    "thefinals": ["The Finals/Discovery/Binaries/Win64/Discovery-Win64-Shipping.exe"],
+    "marvelrivals": ["Marvel Rivals/MarvelGame/Binaries/Win64/Marvel-Win64-Shipping.exe"],
+    "r6siege": ["Rainbow Six Siege/RainbowSixSiege.exe"],
+    "overwatch2": ["Overwatch/Overwatch.exe"],
+    "destiny2": ["Destiny 2/destiny2.exe"],
+    "tarkov": ["EscapeFromTarkov/EscapeFromTarkov.exe"],
+    "rust": ["Rust/RustClient.exe"],
+    "rocketleague": ["rocket league/Binaries/Win64/RocketLeague.exe"],
+    "seaofthieves": ["Sea of Thieves/Athena/Binaries/Win64/SoTGame-Win64-Shipping.exe"],
+}
+
+# Игры вне Steam (Riot / Epic / Battlestate) — типовые пути установки.
+_ABSOLUTE_EXE = {
+    "valorant": [
+        r"C:\Riot Games\VALORANT\live\ShooterGame\Binaries\Win64\VALORANT-Win64-Shipping.exe",
+    ],
+    "fortnite": [
+        r"C:\Program Files\Epic Games\Fortnite\FortniteGame\Binaries\Win64\FortniteClient-Win64-Shipping.exe",
+    ],
+    "tarkov": [
+        r"C:\Battlestate Games\Escape from Tarkov\EscapeFromTarkov.exe",
+        r"D:\Battlestate Games\Escape from Tarkov\EscapeFromTarkov.exe",
+    ],
 }
 
 
@@ -56,6 +80,10 @@ class WinSetting:
 
 
 def game_exe_path(game_key: str) -> str | None:
+    for absolute in _ABSOLUTE_EXE.get(game_key, []):
+        candidate = Path(absolute)
+        if candidate.is_file():
+            return str(candidate)
     rels = _GAME_EXE.get(game_key, [])
     for steam_root in _steam_roots():
         for library in _library_roots(steam_root):

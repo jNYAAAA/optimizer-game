@@ -33,6 +33,16 @@ STEAM_APPIDS: dict[str, int] = {
     "dayz": 221100,
     "gtav": 271590,
     "wardogs": 1867240,
+    "thefinals": 2073850,
+    "marvelrivals": 2767030,
+    "r6siege": 359550,
+    "overwatch2": 2357570,
+    "destiny2": 1085660,
+    "tarkov": 3932890,
+    "rust": 252490,
+    "rocketleague": 252950,
+    "warzone": 1962663,
+    "seaofthieves": 1172620,
 }
 
 # Готовые (проверенные) параметры запуска. Для остальных игр строка пустая —
@@ -41,6 +51,11 @@ RECOMMENDED: dict[str, str] = {
     "wardogs": (
         "-dx12 -USEALLAVAILABLECORES -high -nosplash -malloc=system -nogpucrashdebugging"
     ),
+    # Игры на Unreal Engine понимают эти флаги: все ядра ЦП, высокий приоритет
+    # процесса и отключение заставки при запуске.
+    "thefinals": "-USEALLAVAILABLECORES -high -nosplash",
+    "marvelrivals": "-USEALLAVAILABLECORES -high -nosplash",
+    "seaofthieves": "-USEALLAVAILABLECORES -high -nosplash",
 }
 
 RECOMMENDED_HELP = (

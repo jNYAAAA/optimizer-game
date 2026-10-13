@@ -40,6 +40,53 @@ _UE_QUALITY = [
 # В WARDOGS у групп качества есть дополнительный уровень 4 («Overkill»).
 _UE_QUALITY_MAX = list(_UE_QUALITY) + [("4", "Ультра (Overkill)")]
 
+# Стандартные группы масштабируемости Unreal Engine для игр, у которых формат
+# GameUserSettings.ini не отличается от общепринятого.
+_UE_PERF_OPTIONS = [
+    ("0", "Минимум"),
+    ("1", "Низкое"),
+    ("2", "Среднее"),
+    ("3", "Высокое"),
+]
+
+
+def _ue_settings() -> list[Setting]:
+    """Типовой набор графических параметров UE-игры (секция ScalabilityGroups)."""
+    specs = [
+        (
+            "sg.ResolutionQuality", "100.000000", "Масштаб разрешения рендера",
+            "Разрешение рендера. 100% — максимум чёткости; снижайте, только если не "
+            "хватает FPS (лучше сначала DLSS/FSR в самой игре).",
+            [("100.000000", "100%"), ("90.000000", "90%"), ("80.000000", "80%")],
+        ),
+        ("sg.ViewDistanceQuality", "2", "Дальность прорисовки",
+         "Как далеко видны объекты и игроки. Резать в последнюю очередь.", list(_UE_PERF_OPTIONS)),
+        ("sg.AntiAliasingQuality", "2", "Сглаживание",
+         "Сглаживание краёв. Среднее — разумный компромисс.", list(_UE_PERF_OPTIONS)),
+        ("sg.ShadowQuality", "0", "Тени",
+         "Качество теней. Низкое даёт заметный прирост FPS.", list(_UE_PERF_OPTIONS)),
+        ("sg.GlobalIlluminationQuality", "0", "Глобальное освещение",
+         "Один из самых дорогих параметров — минимум даёт ощутимый прирост FPS.",
+         list(_UE_PERF_OPTIONS)),
+        ("sg.ReflectionQuality", "0", "Отражения",
+         "Отражения редко важны в динамичном бою.", list(_UE_PERF_OPTIONS)),
+        ("sg.PostProcessQuality", "0", "Постобработка",
+         "Эффекты постобработки: свечение, размытие и т.п.", list(_UE_PERF_OPTIONS)),
+        ("sg.TextureQuality", "2", "Текстуры",
+         "Качество текстур. На мощных GPU почти не влияет на FPS.", list(_UE_PERF_OPTIONS)),
+        ("sg.EffectsQuality", "0", "Эффекты",
+         "Взрывы, дым и искры — заметная нагрузка в массовых боях.", list(_UE_PERF_OPTIONS)),
+        ("sg.FoliageQuality", "0", "Растительность",
+         "Трава и листва. Минимум ещё и улучшает видимость противников.",
+         list(_UE_PERF_OPTIONS)),
+        ("sg.ShadingQuality", "1", "Затенение",
+         "Сложность шейдинга. Низкое заметно снижает нагрузку.", list(_UE_PERF_OPTIONS)),
+    ]
+    return [
+        Setting(key, value, label, "ScalabilityGroups", help=help_text, options=list(options))
+        for key, value, label, help_text, options in specs
+    ]
+
 _GTAV_TEMPLATE = """<?xml version="1.0" encoding="UTF-8"?>
 <Settings>
   <version value="27" />
@@ -141,6 +188,16 @@ class GameProfile:
             "apex": "r5apex.exe",
             "pubg": "tslgame.exe",
             "wardogs": "wardogsclient-win64-shipping.exe",
+            "valorant": "valorant-win64-shipping.exe",
+            "fortnite": "fortniteclient-win64-shipping.exe",
+            "thefinals": "discovery-win64-shipping.exe",
+            "marvelrivals": "marvel-win64-shipping.exe",
+            "r6siege": "rainbowsixsiege.exe",
+            "overwatch2": "overwatch.exe",
+            "destiny2": "destiny2.exe",
+            "tarkov": "escapefromtarkov.exe",
+            "rust": "rustclient.exe",
+            "rocketleague": "rocketleague.exe",
         }.get(self.key, "")
 
 
@@ -875,6 +932,103 @@ GAMES: list[GameProfile] = [
             ),
         ],
     ),
+    # --- Популярные игры ---
+    GameProfile(
+        key="valorant",
+        name="VALORANT",
+        logo="games/valorant-cover.png",
+        kind="ini",
+        locator="valorant",
+        settings=_ue_settings(),
+    ),
+    GameProfile(
+        key="fortnite",
+        name="Fortnite",
+        logo="games/fortnite-cover.png",
+        kind="ini",
+        locator="fortnite",
+        settings=_ue_settings(),
+    ),
+    GameProfile(
+        key="thefinals",
+        name="THE FINALS",
+        logo="games/thefinals-cover.png",
+        kind="ini",
+        locator="thefinals",
+        settings=_ue_settings(),
+    ),
+    GameProfile(
+        key="marvelrivals",
+        name="Marvel Rivals",
+        logo="games/marvelrivals-cover.png",
+        kind="ini",
+        locator="marvelrivals",
+        settings=_ue_settings(),
+    ),
+    GameProfile(
+        key="seaofthieves",
+        name="Sea of Thieves",
+        logo="games/seaofthieves-cover.png",
+        kind="ini",
+        locator="seaofthieves",
+        settings=_ue_settings(),
+    ),
+    GameProfile(
+        key="r6siege",
+        name="Rainbow Six Siege",
+        logo="games/r6siege-cover.png",
+        kind="ini",
+        locator="r6siege",
+        settings=[],
+    ),
+    GameProfile(
+        key="overwatch2",
+        name="Overwatch 2",
+        logo="games/overwatch2-cover.png",
+        kind="ini",
+        locator="overwatch2",
+        settings=[],
+    ),
+    GameProfile(
+        key="destiny2",
+        name="Destiny 2",
+        logo="games/destiny2-cover.png",
+        kind="xml",
+        locator="destiny2",
+        settings=[],
+    ),
+    GameProfile(
+        key="tarkov",
+        name="Escape from Tarkov",
+        logo="games/tarkov-cover.png",
+        kind="ini",
+        locator="tarkov",
+        settings=[],
+    ),
+    GameProfile(
+        key="rust",
+        name="Rust",
+        logo="games/rust-cover.png",
+        kind="cfg",
+        locator="rust",
+        settings=[],
+    ),
+    GameProfile(
+        key="rocketleague",
+        name="Rocket League",
+        logo="games/rocketleague-cover.png",
+        kind="ini",
+        locator="rocketleague",
+        settings=[],
+    ),
+    GameProfile(
+        key="warzone",
+        name="Call of Duty: Warzone",
+        logo="games/warzone-cover.png",
+        kind="cfg",
+        locator="warzone",
+        settings=[],
+    ),
 ]
 
 GAMES_BY_KEY = {game.key: game for game in GAMES}
@@ -1181,8 +1335,30 @@ def _library_roots(steam_root: Path) -> list[Path]:
     return roots
 
 
+# Папки UE-игр в %LOCALAPPDATA% и варианты подпапки конфигурации.
+_UE_FOLDERS: dict[str, list[tuple[str, str]]] = {
+    "valorant": [("VALORANT", "Windows"), ("VALORANT", "WindowsClient")],
+    "fortnite": [("FortniteGame", "WindowsClient"), ("FortniteGame", "Windows")],
+    "thefinals": [("Discovery", "WindowsClient"), ("Discovery", "Windows")],
+    "marvelrivals": [("Marvel", "WindowsClient"), ("Marvel", "Windows")],
+    "seaofthieves": [("Athena", "WindowsClient"), ("Athena", "Windows")],
+}
+
+
+def _ue_config_paths(game_key: str) -> list[Path]:
+    base = Path(os.environ.get("LOCALAPPDATA", ""))
+    found: list[Path] = []
+    for folder, variant in _UE_FOLDERS.get(game_key, []):
+        candidate = base / folder / "Saved" / "Config" / variant / "GameUserSettings.ini"
+        if candidate.is_file():
+            found.append(candidate)
+    return found
+
+
 def _locate(profile: GameProfile) -> list[Path]:
     locator = profile.locator
+    if locator in _UE_FOLDERS:
+        return _ue_config_paths(locator)
     if locator.startswith("steam:"):
         _, appid, rel = locator.split(":", 2)
         files: list[Path] = []

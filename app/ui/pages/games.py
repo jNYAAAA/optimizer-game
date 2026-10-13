@@ -20,6 +20,7 @@ from PySide6.QtWidgets import (
     QGridLayout,
     QHBoxLayout,
     QLabel,
+    QLineEdit,
     QMessageBox,
     QProgressBar,
     QPushButton,
@@ -449,10 +450,7 @@ class _GamePanel(QWidget):
         name = QLabel(profile.name)
         name.setObjectName("PageTitle")
         info.addWidget(name)
-        caption = QLabel(
-            f"{len(profile.settings)} настроек игры · «Убрать тени», NVIDIA и параметры "
-            "запуска — в своих разделах"
-        )
+        caption = QLabel(self._caption_text(profile))
         caption.setObjectName("Caption")
         info.addWidget(caption)
         info.addStretch(1)
@@ -483,6 +481,19 @@ class _GamePanel(QWidget):
         self._select_section(self.sections.index("ИГРА"))
 
         root.addStretch(0)
+
+    @staticmethod
+    def _caption_text(profile: GameProfile) -> str:
+        parts: list[str] = []
+        parts.append(
+            f"{len(profile.settings)} настроек игры"
+            if profile.settings
+            else "Настройки файла игры ещё не добавлены"
+        )
+        if profile.disable_shadows:
+            parts.append("«Убрать тени»")
+        parts.extend(["NVIDIA", "параметры запуска", "Windows"])
+        return " · ".join(parts) + " — в своих разделах"
 
     def _ensure_section(self, index: int) -> QWidget:
         page = self._section_pages[index]
@@ -521,8 +532,8 @@ class GamesPage(QWidget):
 
         self._header = make_header(
             "Оптимизация игр",
-            "Выберите игру: настройки игры, NVIDIA, параметры запуска Steam и Windows. "
-            "У WARDOGS есть ещё вкладка «Убрать тени».",
+            "Найдите игру в поиске или выберите из списка: настройки игры, NVIDIA, "
+            "параметры запуска Steam и Windows.",
         )
         root.addWidget(self._header)
 
@@ -535,26 +546,63 @@ class GamesPage(QWidget):
         grid_page = QWidget()
         outer = QVBoxLayout(grid_page)
         outer.setContentsMargins(0, 0, 0, 0)
+
+        search_row = QHBoxLayout()
+        self.search = QLineEdit()
+        self.search.setPlaceholderText("Поиск игры…")
+        self.search.setClearButtonEnabled(True)
+        self.search.textChanged.connect(self._apply_filter)
+        search_row.addWidget(self.search, 0)
+        search_row.addStretch(1)
+        self.search.setMinimumWidth(320)
+        outer.addLayout(search_row)
+
         row = QHBoxLayout()
         row.addStretch(1)
         self._grid = QGridLayout()
         self._grid.setSpacing(GRID_SPACING)
         self._tiles: list[_GameTile] = []
+        self._visible_tiles: list[_GameTile] = list(self._tiles)
         self._grid_spacing = GRID_SPACING
         for index, profile in enumerate(GAMES):
             tile = _GameTile(profile)
             tile.clicked.connect(lambda idx=index: self._open_game(idx))
             self._grid.addWidget(tile, index // self.COLUMNS, index % self.COLUMNS)
             self._tiles.append(tile)
+        self._visible_tiles = list(self._tiles)
         row.addLayout(self._grid)
         row.addStretch(1)
         outer.addLayout(row)
+        self._empty_label = QLabel("Ничего не найдено — попробуйте другое название.")
+        self._empty_label.setObjectName("PageHint")
+        self._empty_label.setAlignment(Qt.AlignCenter)
+        self._empty_label.setVisible(False)
+        outer.addWidget(self._empty_label)
         outer.addStretch(1)
         self._stack.addWidget(grid_page)
         #: текущая ширина плитки — чтобы не пересобирать обложки на каждый пиксель
         self._tile_width = 0
 
         root.addWidget(self._stack, 1)
+
+    # ------------------------------------------------------------------
+    def _apply_filter(self, text: str) -> None:
+        """Показывает только игры, в названии которых есть введённый текст."""
+        query = text.strip().lower()
+        self._visible_tiles = [
+            tile for tile in self._tiles if not query or query in tile.profile.name.lower()
+        ]
+        for tile in self._tiles:
+            if tile not in self._visible_tiles:
+                tile.setVisible(False)
+        while self._grid.count():
+            self._grid.takeAt(0)
+        for index, tile in enumerate(self._visible_tiles):
+            tile.setVisible(True)
+            self._grid.addWidget(tile, index // self.COLUMNS, index % self.COLUMNS)
+        self._empty_label.setVisible(not self._visible_tiles)
+        self._tile_width = 0
+        self._relayout()
 
     # ------------------------------------------------------------------
     def resizeEvent(self, event) -> None:  # noqa: N802 - Qt API
@@ -567,11 +615,12 @@ class GamesPage(QWidget):
 
     def _relayout(self) -> None:
         """Подбирает размер плиток так, чтобы они занимали доступное место."""
-        if not self._tiles:
+        if not self._visible_tiles:
             return
         margins = self.layout().contentsMargins()
         columns = self.COLUMNS
-        rows = -(-len(self._tiles) // columns)
+        rows = -(-len(self._visible_tiles) // columns)
+        search_height = self.search.sizeHint().height() + self.layout().spacing()
         avail_w = self.width() - margins.left() - margins.right()
         avail_h = (
             self.height()
@@ -579,6 +628,7 @@ class GamesPage(QWidget):
             - margins.bottom()
             - self._header.sizeHint().height()
             - self.layout().spacing()
+            - search_height
             - 16  # небольшой запас, чтобы нижний ряд не упирался в край
         )
         # Ширину плитки ограничивают и ширина, и высота окна: нужно уместить
@@ -595,7 +645,7 @@ class GamesPage(QWidget):
         self._tile_width = width
         self._grid_spacing = spacing
         self._grid.setSpacing(spacing)
-        for tile in self._tiles:
+        for tile in self._visible_tiles:
             tile.set_size(width, int(width * TILE_RATIO))
 
     def _open_game(self, index: int) -> None:
