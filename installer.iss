@@ -25,7 +25,6 @@ UninstallDisplayIcon={app}\icon.ico
 Compression=lzma2/max
 SolidCompression=yes
 WizardStyle=modern
-WizardResizable=no
 WizardImageFile=assets\installer\wizard.bmp
 WizardSmallImageFile=assets\installer\wizard_small.bmp
 InfoBeforeFile=assets\installer\before.txt
