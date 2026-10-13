@@ -21,7 +21,6 @@ from PySide6.QtWidgets import (
 from ...core.drivers import (
     DriverInfo,
     MotherboardDriverInfo,
-    ProblemDevice,
     VendorDriverInfo,
     check_driver_updates,
     check_gpu_drivers,
@@ -29,7 +28,7 @@ from ...core.drivers import (
     install_windows_driver_updates,
     list_drivers,
     motherboard_driver_info,
-    problem_devices,
+    problem_devices_split,
 )
 from ...core.workers import Worker, start_worker
 from .. import theme
@@ -151,7 +150,7 @@ class DriversPage(QWidget):
             progress(60, "Определение материнской платы…")
             mobo = motherboard_driver_info(drivers)
             progress(80, "Поиск устройств без драйверов…")
-            problems = problem_devices()
+            problems = problem_devices_split()
             return drivers, mobo, problems
 
         worker = Worker(task, pass_progress=True)
@@ -209,14 +208,21 @@ class DriversPage(QWidget):
         self.mobo_btn.setEnabled(bool(mobo.url))
         self.mobo_search_btn.setEnabled(bool(mobo.search_url))
 
-    def _on_problems(self, problems: list[ProblemDevice]) -> None:
+    def _on_problems(self, result) -> None:
+        problems, hidden = result
         self.problems_card.clear()
         if not problems:
             self.problems_card.add_row(
-                "Статус", "Все устройства работают — драйверов не хватает? Нет."
+                "Статус", "Не найдено устройств, которым нужен драйвер."
             )
+            if hidden:
+                self.problems_card.add_row(
+                    "Скрыто", f"виртуальных/служебных устройств: {hidden}"
+                )
             return
         self.problems_card.add_row("Найдено устройств", str(len(problems)))
+        if hidden:
+            self.problems_card.add_row("Скрыто", f"виртуальных/служебных: {hidden}")
         for device in problems:
             text = f"{device.status} · {device.device_class}"
             label = self.problems_card.add_row(device.name, text)

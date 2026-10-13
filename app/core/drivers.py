@@ -694,8 +694,44 @@ def motherboard_driver_info(drivers: list[DriverInfo] | None = None) -> Motherbo
     )
 
 
-def problem_devices() -> list[ProblemDevice]:
-    """Устройства, у которых нет драйвера (или он с ошибкой)."""
+# Виртуальные и служебные устройства: у них статус с ошибкой — обычное дело,
+# и «драйверы» для них искать не нужно.
+_VIRTUAL_NAME_HINTS = (
+    "virtual adapter",
+    "virtual wifi",
+    "wi-fi direct",
+    "wireless virtual",
+    "wan miniport",
+    "kernel debug",
+    "teredo",
+    "6to4",
+    "isatap",
+    "virtual switch",
+    "remote ndis",
+    "ndis virtual",
+)
+_VIRTUAL_HWID_HINTS = ("vwifimp", "ms_agile", "ms_ndisuio", "root\\kdnic")
+_BENIGN_CLASSES = {"SOFTWAREDEVICE"}
+
+
+def _is_benign_problem(device: ProblemDevice) -> bool:
+    """Виртуальное/служебное устройство, для которого драйвер не требуется."""
+    name = device.name.lower()
+    hwid = (device.hardware_id or "").lower()
+    device_class = (device.device_class or "").upper()
+
+    if device_class in _BENIGN_CLASSES:
+        return True
+    if any(hint in name for hint in _VIRTUAL_NAME_HINTS):
+        return True
+    if any(hint in hwid for hint in _VIRTUAL_HWID_HINTS):
+        return True
+    if hwid.startswith("{") or hwid.startswith("root\\"):
+        return True
+    return False
+
+
+def _read_problem_devices() -> list[ProblemDevice]:
     try:
         data = powershell_json(_PROBLEM_SCRIPT, timeout=60)
     except Exception:  # noqa: BLE001
@@ -717,3 +753,15 @@ def problem_devices() -> list[ProblemDevice]:
             )
         )
     return devices
+
+
+def problem_devices() -> list[ProblemDevice]:
+    """Устройства без драйвера, без виртуальных и служебных."""
+    return [d for d in _read_problem_devices() if not _is_benign_problem(d)]
+
+
+def problem_devices_split() -> tuple[list[ProblemDevice], int]:
+    """Список устройств без драйвера и сколько виртуальных/служебных скрыто."""
+    raw = _read_problem_devices()
+    visible = [d for d in raw if not _is_benign_problem(d)]
+    return visible, len(raw) - len(visible)
