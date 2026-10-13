@@ -7,6 +7,7 @@
 from __future__ import annotations
 
 from PySide6.QtCore import Qt
+from PySide6.QtGui import QGuiApplication
 from PySide6.QtWidgets import (
     QHBoxLayout,
     QLabel,
@@ -24,6 +25,8 @@ from ...core.launch_options import (
     LaunchOptionsResult,
     apply_launch_options,
     current_launch_options,
+    manual_launch_options,
+    save_manual_launch_options,
     steam_running,
 )
 from ...core.workers import Worker, start_worker
@@ -41,6 +44,9 @@ class LaunchOptionsPage(QWidget):
         super().__init__(parent)
         self.game_key = game_key
         self.appid = STEAM_APPIDS.get(game_key)
+        # Игры вне Steam (Epic/Riot): строку задают в лаунчере, поэтому она
+        # сохраняется в данных приложения и копируется в буфер.
+        self.manual = self.appid is None
 
         root = QVBoxLayout(self)
         root.setSpacing(14)
@@ -49,14 +55,18 @@ class LaunchOptionsPage(QWidget):
             root.addWidget(
                 make_header(
                     "Параметры запуска",
-                    "Строка параметров запуска игры из Steam. Рекомендованные параметры уже "
-                    "подставлены — проверьте и нажмите «Применить». Steam должен быть закрыт.",
+                    "Строка параметров запуска игры. Рекомендованные параметры уже "
+                    "подставлены — проверьте и нажмите «Применить».",
                 )
             )
         else:
             root.setContentsMargins(0, 0, 0, 0)
 
-        self.help_label = QLabel("Чтение настроек Steam…")
+        self.help_label = QLabel(
+            "Для этой игры параметры задаются в лаунчере — строка скопируется в буфер."
+            if self.manual
+            else "Чтение настроек Steam…"
+        )
         self.help_label.setObjectName("PageHint")
         self.help_label.setWordWrap(True)
         root.addWidget(self.help_label)
@@ -85,6 +95,9 @@ class LaunchOptionsPage(QWidget):
         self.clear_btn = QPushButton("ОЧИСТИТЬ СТРОКУ")
         self.clear_btn.clicked.connect(self._clear)
         controls.addWidget(self.clear_btn)
+        self.copy_btn = QPushButton("СКОПИРОВАТЬ")
+        self.copy_btn.clicked.connect(self._copy)
+        controls.addWidget(self.copy_btn)
         self.refresh_btn = QPushButton("ОБНОВИТЬ")
         self.refresh_btn.clicked.connect(self.refresh)
         controls.addWidget(self.refresh_btn)
@@ -101,14 +114,6 @@ class LaunchOptionsPage(QWidget):
         root.addWidget(self.log)
         root.addStretch(1)
 
-        if self.appid is None:
-            self.edit.setEnabled(False)
-            self.apply_btn.setEnabled(False)
-            self.clear_btn.setEnabled(False)
-            self.refresh_btn.setEnabled(False)
-            self.help_label.setText(
-                "Для этой игры неизвестен идентификатор Steam — параметры запуска недоступны."
-            )
         self._loaded = False
 
     # ------------------------------------------------------------------
@@ -119,7 +124,8 @@ class LaunchOptionsPage(QWidget):
             self.refresh()
 
     def refresh(self) -> None:
-        if self.appid is None:
+        if self.manual:
+            self._show_manual()
             return
         self.progress.setRange(0, 0)
         self.refresh_btn.setEnabled(False)
@@ -127,6 +133,22 @@ class LaunchOptionsPage(QWidget):
         worker.signals.finished.connect(self._on_current)
         worker.signals.failed.connect(self._on_failed)
         start_worker(worker)
+
+    def _show_manual(self) -> None:
+        self.progress.setRange(0, 100)
+        self.progress.setValue(100)
+        recommended = RECOMMENDED.get(self.game_key, "")
+        saved = manual_launch_options(self.game_key)
+        self.edit.setText(saved or recommended)
+        self.status(
+            "Для этой игры параметры задаются в лаунчере (Epic/Riot): нажмите «Применить» — "
+            "строка сохранится и скопируется в буфер, вставьте её в настройках игры.",
+            theme.palette()["TEXT_DIM"],
+        )
+
+    def _copy(self) -> None:
+        QGuiApplication.clipboard().setText(self.edit.text().strip())
+        self.log.log("Строка параметров запуска скопирована в буфер обмена.")
 
     def _on_current(self, result: tuple) -> None:
         self.progress.setRange(0, 100)
@@ -188,6 +210,16 @@ class LaunchOptionsPage(QWidget):
 
     def _apply(self) -> None:
         value = self.edit.text().strip()
+        if self.manual:
+            save_manual_launch_options(self.game_key, value)
+            QGuiApplication.clipboard().setText(value)
+            self.status(
+                "Строка сохранена и скопирована — вставьте её в лаунчере игры "
+                "(Epic Games / Riot Client).",
+                theme.palette()["OK"],
+            )
+            self.log.log("Параметры запуска сохранены и скопированы в буфер обмена.")
+            return
         label = "Запись параметров запуска…" if value else "Очистка параметров запуска…"
         self._run(label, apply_launch_options, self.game_key, value)
 
@@ -203,7 +235,7 @@ class LaunchOptionsPage(QWidget):
         start_worker(worker)
 
     def _set_busy(self, busy: bool) -> None:
-        for button in (self.apply_btn, self.clear_btn, self.refresh_btn):
+        for button in (self.apply_btn, self.clear_btn, self.copy_btn, self.refresh_btn):
             button.setEnabled(not busy)
 
     def _on_progress(self, percent: int, message: str) -> None:

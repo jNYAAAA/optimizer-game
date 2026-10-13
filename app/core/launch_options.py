@@ -56,7 +56,28 @@ RECOMMENDED: dict[str, str] = {
     "thefinals": "-USEALLAVAILABLECORES -high -nosplash",
     "marvelrivals": "-USEALLAVAILABLECORES -high -nosplash",
     "seaofthieves": "-USEALLAVAILABLECORES -high -nosplash",
+    # Игры вне Steam (Epic / Riot): строку нужно вставить в лаунчере вручную.
+    "fortnite": "-USEALLAVAILABLECORES -high -nosplash",
+    "valorant": "-high -noborder",
 }
+
+# Параметры для игр вне Steam сохраняются в данных приложения.
+_MANUAL_FILE = "launch_manual.json"
+
+
+def manual_launch_options(game_key: str) -> str:
+    data = load_json(_MANUAL_FILE, {})
+    if not isinstance(data, dict):
+        return ""
+    return str(data.get(game_key) or "")
+
+
+def save_manual_launch_options(game_key: str, value: str) -> None:
+    data = load_json(_MANUAL_FILE, {})
+    if not isinstance(data, dict):
+        data = {}
+    data[game_key] = value
+    save_json(_MANUAL_FILE, data)
 
 RECOMMENDED_HELP = (
     "-dx12 — рендер DirectX 12 (в UE5 он и так по умолчанию); "
