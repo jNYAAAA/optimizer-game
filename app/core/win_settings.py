@@ -42,26 +42,16 @@ _GAME_EXE = {
     "wardogs": ["Wardogs/Wardogs/Binaries/Win64/WardogsClient-Win64-Shipping.exe"],
     "thefinals": ["The Finals/Discovery/Binaries/Win64/Discovery-Win64-Shipping.exe"],
     "marvelrivals": ["Marvel Rivals/MarvelGame/Binaries/Win64/Marvel-Win64-Shipping.exe"],
-    "r6siege": ["Rainbow Six Siege/RainbowSixSiege.exe"],
-    "overwatch2": ["Overwatch/Overwatch.exe"],
-    "destiny2": ["Destiny 2/destiny2.exe"],
-    "tarkov": ["EscapeFromTarkov/EscapeFromTarkov.exe"],
-    "rust": ["Rust/RustClient.exe"],
-    "rocketleague": ["rocket league/Binaries/Win64/RocketLeague.exe"],
     "seaofthieves": ["Sea of Thieves/Athena/Binaries/Win64/SoTGame-Win64-Shipping.exe"],
 }
 
-# Игры вне Steam (Riot / Epic / Battlestate) — типовые пути установки.
+# Игры вне Steam (Riot / Epic) — типовые пути установки.
 _ABSOLUTE_EXE = {
     "valorant": [
         r"C:\Riot Games\VALORANT\live\ShooterGame\Binaries\Win64\VALORANT-Win64-Shipping.exe",
     ],
     "fortnite": [
         r"C:\Program Files\Epic Games\Fortnite\FortniteGame\Binaries\Win64\FortniteClient-Win64-Shipping.exe",
-    ],
-    "tarkov": [
-        r"C:\Battlestate Games\Escape from Tarkov\EscapeFromTarkov.exe",
-        r"D:\Battlestate Games\Escape from Tarkov\EscapeFromTarkov.exe",
     ],
 }
 

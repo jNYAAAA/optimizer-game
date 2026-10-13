@@ -112,13 +112,6 @@ NVIDIA_PROFILES: dict[str, list[NvidiaSetting]] = {
     "fortnite": _settings({**_COMMON, "low_latency": "on", "power": "max", "tex_quality": "highperf", "max_fps": "off"}),
     "thefinals": _settings({**_COMMON, "low_latency": "ultra", "power": "max", "tex_quality": "highperf", "max_fps": "off"}),
     "marvelrivals": _settings({**_COMMON, "low_latency": "on", "power": "max", "tex_quality": "highperf", "max_fps": "off"}),
-    "r6siege": _settings({**_COMMON, "low_latency": "off", "power": "max", "tex_quality": "highperf", "max_fps": "off"}),
-    "overwatch2": _settings({**_COMMON, "low_latency": "off", "power": "max", "tex_quality": "highperf", "max_fps": "off"}),
-    "destiny2": _settings({**_COMMON, "low_latency": "on", "power": "max", "tex_quality": "highperf", "max_fps": "off"}),
-    "tarkov": _settings({**_COMMON, "low_latency": "on", "power": "max", "tex_quality": "highperf", "max_fps": "off"}),
-    "rust": _settings({**_COMMON, "low_latency": "on", "power": "max", "tex_quality": "highperf", "max_fps": "off"}),
-    "rocketleague": _settings({**_COMMON, "low_latency": "on", "power": "max", "tex_quality": "highperf", "max_fps": "off"}),
-    "warzone": _settings({**_COMMON, "low_latency": "on", "power": "max", "tex_quality": "highperf", "max_fps": "off"}),
     "seaofthieves": _settings({**_COMMON, "low_latency": "on", "power": "max", "tex_quality": "highperf", "max_fps": "off"}),
 }
 

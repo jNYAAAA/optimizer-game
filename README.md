@@ -25,15 +25,12 @@
 - **Вкладка «Оптимизация игр»** — сетка игр с крупными обложками (картинка занимает всю
   плитку, название — на тёмной полосе поверх неё), **поиском по названию** и профилями
   настроек «максимум FPS без потери качества»: **Counter-Strike 2, Dota 2, Apex Legends,
-  PUBG, Squad, DayZ, Grand Theft Auto V, WARDOGS** и ещё 12 популярных игр —
-  **VALORANT, Fortnite, THE FINALS, Marvel Rivals, Sea of Thieves, Rainbow Six Siege,
-  Overwatch 2, Destiny 2, Escape from Tarkov, Rust, Rocket League, Call of Duty: Warzone**.
+  PUBG, Squad, DayZ, Grand Theft Auto V, WARDOGS** и ещё 5 популярных игр —
+  **VALORANT, Fortnite, THE FINALS, Marvel Rivals, Sea of Thieves**.
   У WARDOGS профиль собран из групп масштабируемости UE5
   (`[ScalabilityGroups]`) и настроек игры (`[/Script/WDGame.WDUserSettings]`): DLSS/FSR,
   Reflex, глобальное освещение, частицы, PIP-прицел и др. UE-игры (VALORANT, Fortnite,
-  THE FINALS, Marvel Rivals, Sea of Thieves) используют типовые `sg.*`-группы качества;
-  для остальных новых игр настройки файла игры ещё добавляются (у них уже доступны
-  разделы NVIDIA, запуска и Windows). У каждой
+  THE FINALS, Marvel Rivals, Sea of Thieves) используют типовые `sg.*`-группы качества. У каждой
   настройки — пояснение, выбор значения и отдельное
   применение; есть откат из резервной копии. В разделе «Игра» есть **пресеты
   «Макс. производительность / Баланс / Качество»**, которые сразу подставляют значения

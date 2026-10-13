@@ -35,13 +35,6 @@ STEAM_APPIDS: dict[str, int] = {
     "wardogs": 1867240,
     "thefinals": 2073850,
     "marvelrivals": 2767030,
-    "r6siege": 359550,
-    "overwatch2": 2357570,
-    "destiny2": 1085660,
-    "tarkov": 3932890,
-    "rust": 252490,
-    "rocketleague": 252950,
-    "warzone": 1962663,
     "seaofthieves": 1172620,
 }
 
