@@ -3,7 +3,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from PySide6.QtCore import QRectF, Qt, QThreadPool, Signal
+from PySide6.QtCore import QRectF, Qt, QThreadPool, QTimer, Signal
 from PySide6.QtGui import (
     QBrush,
     QColor,
@@ -24,6 +24,7 @@ from PySide6.QtWidgets import (
     QMessageBox,
     QProgressBar,
     QPushButton,
+    QScrollArea,
     QStackedWidget,
     QVBoxLayout,
     QWidget,
@@ -98,6 +99,7 @@ class _GameTile(QFrame):
         self.profile = profile
         self.setObjectName("GameTile")
         self.setCursor(Qt.PointingHandCursor)
+        self.setFocusPolicy(Qt.NoFocus)
         self.setAttribute(Qt.WA_Hover, True)
         self._hover = False
         self._source = QPixmap(resource_path(f"assets/{profile.logo}"))
@@ -652,7 +654,25 @@ class GamesPage(QWidget):
         stack_index = self._panels.get(index)
         if stack_index is None:
             panel = _GamePanel(GAMES[index])
-            panel.back_requested.connect(lambda: self._stack.setCurrentIndex(self._grid_index))
+            panel.back_requested.connect(lambda: self._show_grid())
             stack_index = self._stack.addWidget(panel)
             self._panels[index] = stack_index
         self._stack.setCurrentIndex(stack_index)
+        self._reset_scroll()
+
+    def _show_grid(self) -> None:
+        self._stack.setCurrentIndex(self._grid_index)
+        self._reset_scroll()
+
+    def _reset_scroll(self) -> None:
+        """Возвращает прокрутку страницы вверх при входе в игру и выходе из неё."""
+        def reset() -> None:
+            widget = self.parentWidget()
+            while widget is not None:
+                if isinstance(widget, QScrollArea):
+                    widget.verticalScrollBar().setValue(0)
+                    return
+                widget = widget.parentWidget()
+
+        reset()
+        QTimer.singleShot(0, reset)

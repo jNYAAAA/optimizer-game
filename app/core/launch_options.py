@@ -41,6 +41,13 @@ STEAM_APPIDS: dict[str, int] = {
 # Готовые (проверенные) параметры запуска. Для остальных игр строка пустая —
 # параметры вводятся вручную.
 RECOMMENDED: dict[str, str] = {
+    "cs2": "-novid -nojoy -high +fps_max 0",
+    "dota2": "-novid -high",
+    "apex": "-novid -high",
+    "pubg": "-high -USEALLAVAILABLECORES -malloc=system",
+    "squad": "-high -USEALLAVAILABLECORES -nosplash",
+    "dayz": "-high -nosplash -noPause",
+    "gtav": "-high",
     "wardogs": (
         "-dx12 -USEALLAVAILABLECORES -high -nosplash -malloc=system -nogpucrashdebugging"
     ),
