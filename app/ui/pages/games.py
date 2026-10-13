@@ -42,6 +42,7 @@ from ...core.games import (
     restore_game_settings,
     running_game_keys,
 )
+from ...core.launch_options import STEAM_APPIDS
 from ...core.workers import Worker, start_worker
 from ...utils import resource_path
 from .. import theme
@@ -464,6 +465,9 @@ class _GamePanel(QWidget):
         self.sections = list(SECTIONS)
         if profile.disable_shadows:
             self.sections.insert(self.sections.index("ИГРА") + 1, SHADOW_SECTION)
+        # У игр вне Steam (Epic/Riot) нет параметров запуска Steam — вкладку убираем.
+        if profile.key not in STEAM_APPIDS:
+            self.sections.remove("ЗАПУСК")
         # Под-разделы создаются только при первом открытии —
         # это заметно ускоряет запуск и смену темы.
         self._section_pages: list[QWidget | None] = [None] * len(self.sections)
@@ -494,7 +498,10 @@ class _GamePanel(QWidget):
         )
         if profile.disable_shadows:
             parts.append("«Убрать тени»")
-        parts.extend(["NVIDIA", "параметры запуска", "Windows"])
+        parts.append("NVIDIA")
+        if profile.key in STEAM_APPIDS:
+            parts.append("параметры запуска")
+        parts.append("Windows")
         return " · ".join(parts) + " — в своих разделах"
 
     def _ensure_section(self, index: int) -> QWidget:
