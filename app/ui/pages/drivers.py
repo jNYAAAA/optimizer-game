@@ -220,10 +220,12 @@ class DriversPage(QWidget):
         for device in problems:
             text = f"{device.status} · {device.device_class}"
             label = self.problems_card.add_row(device.name, text)
+            links = [f'<a href="{device.search_url}">поиск в браузере</a>']
             if device.hardware_id:
-                label.setText(f'{text} · <a href="{device.catalog_url}">найти драйвер</a>')
-                label.setOpenExternalLinks(True)
-                label.setTextInteractionFlags(Qt.TextBrowserInteraction)
+                links.append(f'<a href="{device.catalog_url}">каталог Microsoft</a>')
+            label.setText(f"{text} · " + " · ".join(links))
+            label.setOpenExternalLinks(True)
+            label.setTextInteractionFlags(Qt.TextBrowserInteraction)
 
     def _open_mobo(self) -> None:
         if self._mobo_url:

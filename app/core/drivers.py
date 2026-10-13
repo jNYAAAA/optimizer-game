@@ -132,6 +132,12 @@ class ProblemDevice:
     def catalog_url(self) -> str:
         return catalog_search_url(self.hardware_id)
 
+    @property
+    def search_url(self) -> str:
+        """Поиск драйвера в браузере по имени устройства и его Hardware ID."""
+        parts = [p for p in (self.name, self.hardware_id) if p and p != "—"]
+        return "https://duckduckgo.com/?q=" + quote_plus(" ".join(parts) + " драйвер скачать")
+
 
 _LIST_SCRIPT = r"""
 $ErrorActionPreference = 'SilentlyContinue'
