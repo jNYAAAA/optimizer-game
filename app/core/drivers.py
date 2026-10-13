@@ -9,13 +9,14 @@ from __future__ import annotations
 
 import json
 import os
+import re
 import subprocess
 import tempfile
 import urllib.request
 import xml.etree.ElementTree as ET
 from dataclasses import dataclass, field
 from datetime import datetime
-from urllib.parse import quote_plus
+from urllib.parse import quote, quote_plus
 
 from ..utils import CREATE_NO_WINDOW, as_list, powershell_json, run_powershell
 
@@ -114,6 +115,9 @@ class MotherboardDriverInfo:
     manufacturer: str = "—"
     product: str = "—"
     url: str = ""
+    search_url: str = ""
+    platform: str = ""
+    hints: list[str] = field(default_factory=list)
 
 
 @dataclass
@@ -509,7 +513,13 @@ def install_nvidia_driver(download_url: str, progress=None) -> tuple[bool, str]:
 _BASEBOARD_SCRIPT = r"""
 $ErrorActionPreference = 'SilentlyContinue'
 $b = Get-CimInstance Win32_BaseBoard | Select-Object -First 1
-[ordered]@{ manufacturer = "$($b.Manufacturer)"; product = "$($b.Product)" } | ConvertTo-Json -Compress
+$c = Get-CimInstance Win32_Processor | Select-Object -First 1
+[ordered]@{
+    manufacturer = "$($b.Manufacturer)"
+    product      = "$($b.Product)"
+    cpu          = "$($c.Manufacturer)"
+    cpuName      = "$($c.Name)"
+} | ConvertTo-Json -Compress
 """
 
 _PROBLEM_SCRIPT = r"""
@@ -535,25 +545,128 @@ def catalog_search_url(hardware_id: str) -> str:
     return "https://www.catalog.update.microsoft.com/Search.aspx?q=" + quote_plus(query)
 
 
-def _vendor_url(manufacturer: str, product: str) -> str:
+_AMD_CHIPSETS = (
+    "A620", "B650", "X670", "X870", "B840", "B850", "TRX", "WRX",
+    "A520", "B550", "X570", "B450", "X470",
+)
+_INTEL_CHIPSETS = (
+    "H610", "B660", "B760", "B860", "H770", "Z690", "Z790", "Z890",
+    "H610E", "W680", "W790",
+)
+
+
+def _mobo_slug(product: str) -> str:
+    text = re.sub(r"\(rev[^)]*\)", "", product or "", flags=re.IGNORECASE)
+    text = re.sub(r"\(.*?\)", "", text)
+    return re.sub(r"\s+", " ", text).strip()
+
+
+def _platform_from_product(product: str, cpu_manufacturer: str = "") -> str:
+    text = (product or "").upper()
+    if any(chip in text for chip in _AMD_CHIPSETS):
+        return "AMD"
+    if any(chip in text for chip in _INTEL_CHIPSETS):
+        return "Intel"
+    low = (cpu_manufacturer or "").lower()
+    if "amd" in low:
+        return "AMD"
+    if "intel" in low:
+        return "Intel"
+    return ""
+
+
+def _search_url(manufacturer: str, product: str) -> str:
+    query = quote_plus(f"{manufacturer} {product} драйверы скачать")
+    return f"https://duckduckgo.com/?q={query}"
+
+
+def _vendor_url(manufacturer: str, product: str, platform: str) -> str:
+    """Прямая ссылка на страницу драйверов платы у производителя."""
     m = (manufacturer or "").lower()
-    slug = (product or "").strip().replace(" ", "-")
+    slug = _mobo_slug(product)
+    dash = slug.replace(" ", "-")
     if "gigabyte" in m:
-        return f"https://www.gigabyte.com/Motherboard/{slug}/support#support-dl-driver"
+        return f"https://www.gigabyte.com/Motherboard/{dash}/support#support-dl-driver"
     if "msi" in m or "micro-star" in m:
-        return f"https://www.msi.com/Motherboard/{slug}/support"
+        return f"https://www.msi.com/Motherboard/{dash}/support#driver"
     if "asrock" in m:
-        return f"https://www.asrock.com/mb/{slug}/index.asp#Download"
+        segment = f"{platform}/" if platform else ""
+        return f"https://www.asrock.com/mb/{segment}{quote(slug)}/index.asp#Download"
     if "asus" in m:
         return "https://www.asus.com/support/download-center/"
     if "biostar" in m:
-        return "https://www.biostar.com.tw/app/en/mb/introduction.php?S_ID=" + quote_plus(product or "")
-    query = quote_plus(f"{manufacturer} {product} drivers download")
-    return f"https://www.google.com/search?q={query}"
+        return "https://www.biostar.com.tw/app/en/mb/introduction.php?S_ID=" + quote_plus(slug)
+    if "ecs" in m or "elitegroup" in m:
+        return "https://www.ecs.com.tw/en/Product/Motherboard"
+    return _search_url(manufacturer, product)
 
 
-def motherboard_driver_info() -> MotherboardDriverInfo:
-    """Производитель/модель материнской платы и ссылка на её драйверы."""
+def _driver_hints(platform: str, drivers: list[DriverInfo]) -> list[str]:
+    """Какие драйверы платы обычно нужно скачать, по установленным устройствам."""
+    hints: list[str] = []
+
+    def add(text: str) -> None:
+        if text and text not in hints:
+            hints.append(text)
+
+    if platform == "AMD":
+        add("Чипсет AMD")
+    elif platform == "Intel":
+        add("Чипсет Intel")
+    else:
+        add("Чипсет")
+
+    audio_vendor = ""
+    lan_vendor = ""
+    wifi_vendor = ""
+    has_audio = has_lan = has_wifi = has_bt = has_igpu = has_raid = False
+
+    def vendor_of(name: str, options: tuple[str, ...]) -> str:
+        for option in options:
+            if option.lower() in name:
+                return option
+        return ""
+
+    for driver in drivers:
+        device_class = driver.device_class.upper()
+        name = driver.name.lower()
+        if device_class == "MEDIA" and "nvidia" not in name:
+            has_audio = True
+            audio_vendor = audio_vendor or vendor_of(name, ("Realtek", "Conexant", "Creative"))
+        elif device_class == "NET":
+            if any(k in name for k in ("wi-fi", "wifi", "wireless", "802.11")):
+                has_wifi = True
+                wifi_vendor = wifi_vendor or vendor_of(name, ("MediaTek", "Intel", "Realtek", "AMD"))
+            elif any(k in name for k in ("ethernet", "lan", "gbe", "gigabit")):
+                has_lan = True
+                lan_vendor = lan_vendor or vendor_of(name, ("Realtek", "Intel", "Killer", "Marvell"))
+        elif device_class == "BLUETOOTH":
+            has_bt = True
+        elif device_class == "DISPLAY" and any(k in name for k in ("radeon", "amd", "intel", "uhd", "iris")):
+            has_igpu = True
+        elif device_class in ("SCSIADAPTER", "HDC") and "raid" in name:
+            has_raid = True
+
+    if has_audio:
+        add(f"Аудио ({audio_vendor})" if audio_vendor else "Аудио")
+    if has_lan:
+        add(f"Сеть LAN ({lan_vendor})" if lan_vendor else "Сеть LAN")
+    if has_wifi:
+        add(f"Wi-Fi ({wifi_vendor})" if wifi_vendor else "Wi-Fi")
+    if has_bt:
+        add("Bluetooth")
+    if has_igpu:
+        add("Встроенная графика")
+    if has_raid:
+        add("SATA/RAID контроллер")
+    return hints
+
+
+def motherboard_driver_info(drivers: list[DriverInfo] | None = None) -> MotherboardDriverInfo:
+    """Производитель/модель материнской платы, ссылка на драйверы и список нужных.
+
+    ``drivers`` — уже прочитанный список драйверов (для подсказок по устройствам).
+    """
     try:
         data = powershell_json(_BASEBOARD_SCRIPT, timeout=30) or {}
     except Exception:  # noqa: BLE001
@@ -562,7 +675,17 @@ def motherboard_driver_info() -> MotherboardDriverInfo:
         data = {}
     manufacturer = str(data.get("manufacturer") or "—").strip() or "—"
     product = str(data.get("product") or "—").strip() or "—"
-    return MotherboardDriverInfo(manufacturer, product, _vendor_url(manufacturer, product))
+    cpu = str(data.get("cpu") or "")
+    platform = _platform_from_product(product, cpu)
+    hints = _driver_hints(platform, drivers or [])
+    return MotherboardDriverInfo(
+        manufacturer=manufacturer,
+        product=product,
+        url=_vendor_url(manufacturer, product, platform),
+        search_url=_search_url(manufacturer, product),
+        platform=platform,
+        hints=hints,
+    )
 
 
 def problem_devices() -> list[ProblemDevice]:

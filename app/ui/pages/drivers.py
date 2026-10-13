@@ -46,17 +46,23 @@ class DriversPage(QWidget):
         root.addWidget(
             make_header(
                 "Драйверы",
-                "Версии драйверов, проверка Windows Update, официальных сайтов "
-                "производителей и устройств без драйверов.",
+                "Версии драйверов, проверка Windows Update и официальных сайтов. "
+                "Для материнской платы определяется модель, список нужных драйверов и ссылка "
+                "на страницу загрузки у производителя.",
             )
         )
 
         self.mobo_card = Card("Материнская плата")
         self.mobo_card.add_row("Статус", "Определение платы…")
-        self.mobo_btn = QPushButton("ДРАЙВЕРЫ ПЛАТЫ")
+        self.mobo_btn = QPushButton("СТРАНИЦА ДРАЙВЕРОВ")
+        self.mobo_btn.setObjectName("Primary")
         self.mobo_btn.clicked.connect(self._open_mobo)
         self.mobo_btn.setEnabled(False)
         self.mobo_card.add_header_widget(self.mobo_btn)
+        self.mobo_search_btn = QPushButton("ПОИСК В БРАУЗЕРЕ")
+        self.mobo_search_btn.clicked.connect(self._open_mobo_search)
+        self.mobo_search_btn.setEnabled(False)
+        self.mobo_card.add_header_widget(self.mobo_search_btn)
         root.addWidget(self.mobo_card)
 
         self.gpu_card = Card("Видеодрайвер")
@@ -125,6 +131,7 @@ class DriversPage(QWidget):
         self._displays: list[DriverInfo] = []
         self._nvidia_info: VendorDriverInfo | None = None
         self._mobo_url = ""
+        self._mobo_search_url = ""
         self._wu_available = False
         self._loaded = False
 
@@ -142,7 +149,7 @@ class DriversPage(QWidget):
             progress(10, "Чтение драйверов…")
             drivers = list_drivers()
             progress(60, "Определение материнской платы…")
-            mobo = motherboard_driver_info()
+            mobo = motherboard_driver_info(drivers)
             progress(80, "Поиск устройств без драйверов…")
             problems = problem_devices()
             return drivers, mobo, problems
@@ -183,17 +190,24 @@ class DriversPage(QWidget):
 
     def _on_mobo(self, mobo: MotherboardDriverInfo) -> None:
         self._mobo_url = mobo.url
+        self._mobo_search_url = mobo.search_url
         self.mobo_card.clear()
         self.mobo_card.add_row("Производитель", mobo.manufacturer)
         self.mobo_card.add_row("Модель", mobo.product)
+        if mobo.platform:
+            self.mobo_card.add_row("Платформа", mobo.platform)
+        if mobo.hints:
+            self.mobo_card.add_row("Что скачать", " · ".join(mobo.hints))
+            self.log.log("Драйверы платы: " + ", ".join(mobo.hints))
         if mobo.url:
             label = self.mobo_card.add_row(
                 "Драйверы",
-                f'<a href="{mobo.url}">открыть страницу загрузки драйверов</a>',
+                f'<a href="{mobo.url}">страница драйверов на сайте производителя</a>',
             )
             label.setOpenExternalLinks(True)
             label.setTextInteractionFlags(Qt.TextBrowserInteraction)
-            self.mobo_btn.setEnabled(True)
+        self.mobo_btn.setEnabled(bool(mobo.url))
+        self.mobo_search_btn.setEnabled(bool(mobo.search_url))
 
     def _on_problems(self, problems: list[ProblemDevice]) -> None:
         self.problems_card.clear()
@@ -214,6 +228,10 @@ class DriversPage(QWidget):
     def _open_mobo(self) -> None:
         if self._mobo_url:
             webbrowser.open(self._mobo_url)
+
+    def _open_mobo_search(self) -> None:
+        if self._mobo_search_url:
+            webbrowser.open(self._mobo_search_url)
 
     # ------------------------------------------------------------------
     def _check(self) -> None:
