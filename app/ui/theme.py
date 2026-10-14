@@ -22,6 +22,7 @@ DARK = {
     "BG": "#1c2026",
     "BG_ALT": "rgba(38, 44, 52, 0.55)",
     "PANEL": "rgba(46, 52, 61, 0.72)",
+    "PANEL_SOLID": "#252c35",
     "BORDER": "rgba(120, 135, 155, 0.28)",
     "CONTROL": "rgba(46, 52, 61, 0.66)",
     "CONTROL_HOVER": "rgba(58, 66, 78, 0.72)",
@@ -401,6 +402,24 @@ _TEMPLATE = """
         border: 1px solid {BORDER};
         border-radius: 4px;
         padding: 6px 8px;
+    }}
+
+    QDialog, QMessageBox {{
+        background: {PANEL_SOLID};
+    }}
+    QMessageBox QLabel {{
+        background: transparent;
+        color: {TEXT};
+    }}
+    QMessageBox QPushButton {{
+        background: {CONTROL_PRESSED};
+        border: 1px solid {BORDER};
+        color: {TEXT};
+        min-width: 76px;
+    }}
+    QMessageBox QPushButton:hover {{
+        background: {CONTROL_HOVER};
+        border-color: {ACCENT};
     }}
 """
 

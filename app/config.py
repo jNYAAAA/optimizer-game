@@ -12,7 +12,7 @@ from typing import Any
 
 APP_NAME = "OptimizerGame"
 APP_DISPLAY_NAME = "Optimizer Game"
-APP_VERSION = "0.1.0"
+APP_VERSION = "0.1.1"
 
 # Имена файлов хранилища внутри папки данных приложения.
 SETTINGS_FILE = "settings.json"
