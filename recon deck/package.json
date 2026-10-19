@@ -1,0 +1,54 @@
+{
+  "name": "recon-deck",
+  "productName": "Recon Deck",
+  "version": "1.0.0",
+  "description": "Recon Deck — браузер-консоль с каталогом инструментов, встроенным Tor и выходными прокси",
+  "main": "main.js",
+  "license": "MIT",
+  "author": "Recon Deck",
+  "scripts": {
+    "start": "electron .",
+    "dev": "electron . --dev",
+    "build": "electron-builder --win portable --x64"
+  },
+  "devDependencies": {
+    "electron": "^44.9.0",
+    "electron-builder": "^26.15.3"
+  },
+  "build": {
+    "appId": "com.recondeck.app",
+    "productName": "Recon Deck",
+    "asar": true,
+    "directories": {
+      "output": "dist"
+    },
+    "files": [
+      "main.js",
+      "preload.js",
+      "src/**/*",
+      "assets/**/*",
+      "README.md",
+      "package.json"
+    ],
+    "extraResources": [
+      {
+        "from": "resources/tor",
+        "to": "tor"
+      }
+    ],
+    "win": {
+      "icon": "assets/icon.ico",
+      "target": [
+        {
+          "target": "portable",
+          "arch": [
+            "x64"
+          ]
+        }
+      ]
+    },
+    "portable": {
+      "artifactName": "ReconDeck-${version}.exe"
+    }
+  }
+}

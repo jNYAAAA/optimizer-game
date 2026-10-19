@@ -1,0 +1,233 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta http-equiv="Content-Security-Policy"
+        content="default-src 'none'; style-src 'unsafe-inline'; script-src 'unsafe-inline'; img-src data:; form-action https:; base-uri 'none'" />
+  <title>Tor-браузер — Recon Deck</title>
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Ctext y='50' font-size='52'%3E%F0%9F%A7%85%3C/text%3E%3C/svg%3E" />
+  <style>
+    :root {
+      color-scheme: dark;
+      --bg: #070511;
+      --line: rgba(255, 255, 255, 0.08);
+      --text: #f1eefc;
+      --muted: #a9a1c4;
+      --dim: #6f6888;
+      --acc: #a78bfa;
+      --acc2: #5eead4;
+      --mono: "Cascadia Code", Consolas, monospace;
+    }
+    * { box-sizing: border-box; }
+    html, body { height: 100%; margin: 0; }
+    body {
+      display: grid;
+      place-items: center;
+      min-height: 100vh;
+      padding: 40px 24px;
+      font-family: "Segoe UI Variable Text", "Segoe UI", system-ui, sans-serif;
+      color: var(--text);
+      background:
+        radial-gradient(900px 500px at 50% -10%, rgba(139, 92, 246, 0.22), transparent 65%),
+        radial-gradient(700px 420px at 92% 112%, rgba(94, 234, 212, 0.09), transparent 60%),
+        var(--bg);
+      overflow: hidden;
+    }
+    body::before {
+      content: "";
+      position: fixed;
+      inset: 0;
+      background-image:
+        linear-gradient(rgba(255, 255, 255, 0.02) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(255, 255, 255, 0.02) 1px, transparent 1px);
+      background-size: 48px 48px;
+      mask-image: radial-gradient(circle at 50% 35%, #000 0%, transparent 72%);
+      pointer-events: none;
+    }
+    main { position: relative; width: min(760px, 100%); text-align: center; }
+    .kicker {
+      margin-bottom: 22px;
+      font-size: 9px;
+      font-weight: 600;
+      letter-spacing: 0.26em;
+      text-transform: uppercase;
+      color: var(--acc);
+    }
+    .onion {
+      width: 88px;
+      height: 88px;
+      margin: 0 auto 18px;
+      display: grid;
+      place-items: center;
+      border-radius: 50%;
+      font-size: 40px;
+      line-height: 1;
+      background:
+        radial-gradient(circle at 30% 20%, rgba(167, 139, 250, 0.32), transparent 70%),
+        rgba(255, 255, 255, 0.04);
+      border: 1px solid rgba(167, 139, 250, 0.36);
+      box-shadow: 0 0 55px rgba(139, 92, 246, 0.28), inset 0 1px 0 rgba(255, 255, 255, 0.12);
+    }
+    h1 {
+      margin: 0 0 6px;
+      font-size: 34px;
+      font-weight: 640;
+      letter-spacing: -0.02em;
+    }
+    .sub { margin: 0 0 20px; font-size: 12.5px; color: var(--muted); }
+    .status {
+      display: inline-flex;
+      flex-wrap: wrap;
+      align-items: center;
+      justify-content: center;
+      gap: 7px;
+      padding: 8px 14px;
+      border: 1px solid rgba(94, 234, 212, 0.26);
+      border-radius: 999px;
+      background: rgba(94, 234, 212, 0.06);
+      font-size: 10.5px;
+      color: #b8fff4;
+    }
+    .dot {
+      width: 7px;
+      height: 7px;
+      border-radius: 50%;
+      background: #4ade80;
+      box-shadow: 0 0 9px rgba(74, 222, 128, 0.8);
+      animation: pulse 2.2s ease-in-out infinite;
+    }
+    @keyframes pulse { 50% { opacity: 0.42; } }
+    .sep { color: rgba(255, 255, 255, 0.25); }
+    .status b { font-family: var(--mono); font-weight: 500; }
+    #via { font-family: var(--mono); font-size: 10px; }
+    form.search {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin: 26px auto 14px;
+      padding: 6px 6px 6px 16px;
+      border: 1px solid var(--line);
+      border-radius: 14px;
+      background: rgba(10, 8, 20, 0.72);
+      box-shadow: 0 24px 70px -34px rgba(0, 0, 0, 0.9);
+    }
+    form.search:focus-within {
+      border-color: rgba(167, 139, 250, 0.55);
+      box-shadow: 0 0 0 3px rgba(167, 139, 250, 0.08), 0 24px 70px -34px rgba(0, 0, 0, 0.9);
+    }
+    form.search svg {
+      width: 17px;
+      height: 17px;
+      flex: none;
+      fill: none;
+      stroke: #7a7292;
+      stroke-width: 1.7;
+      stroke-linecap: round;
+    }
+    form.search input {
+      flex: 1;
+      height: 38px;
+      min-width: 0;
+      border: none;
+      outline: none;
+      background: transparent;
+      color: var(--text);
+      font-size: 13px;
+    }
+    form.search input::placeholder { color: #6f6888; }
+    form.search button {
+      height: 38px;
+      padding: 0 18px;
+      border: none;
+      border-radius: 9px;
+      background: linear-gradient(135deg, var(--acc), var(--acc2));
+      color: #0b0718;
+      font-size: 11.5px;
+      font-weight: 600;
+      cursor: pointer;
+    }
+    form.search button:hover { filter: brightness(1.08); }
+    .links {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 8px;
+      margin-top: 10px;
+    }
+    .links a {
+      display: block;
+      padding: 11px 9px;
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      background: rgba(255, 255, 255, 0.025);
+      color: #dcd6ef;
+      text-decoration: none;
+      transition: border-color 0.15s ease, background 0.15s ease, transform 0.15s ease;
+    }
+    .links a:hover {
+      border-color: rgba(167, 139, 250, 0.42);
+      background: rgba(167, 139, 250, 0.08);
+      transform: translateY(-1px);
+    }
+    .links a b { display: block; margin-bottom: 2px; font-size: 10.5px; color: #fff; }
+    .links a span { font-family: var(--mono); font-size: 8px; color: var(--dim); }
+    .hint {
+      margin: 22px 0 0;
+      font-size: 9.5px;
+      line-height: 1.65;
+      color: var(--dim);
+    }
+    @media (max-width: 620px) {
+      .links { grid-template-columns: repeat(2, 1fr); }
+      h1 { font-size: 28px; }
+    }
+  </style>
+</head>
+<body>
+  <main>
+    <div class="kicker">Tor Network · Recon Deck</div>
+    <div class="onion">🧅</div>
+    <h1>Tor-браузер</h1>
+    <p class="sub">Весь трафик этой вкладки идёт через сеть Tor</p>
+
+    <div class="status">
+      <span class="dot"></span>
+      <span>Соединение защищено</span>
+      <span class="sep">·</span>
+      <span>IP <b id="ip">—</b></span>
+      <span class="sep" id="via-sep" hidden>·</span>
+      <span id="via" hidden></span>
+    </div>
+
+    <form class="search" action="https://duckduckgo.com/" method="get">
+      <svg viewBox="0 0 20 20" aria-hidden="true"><circle cx="8.8" cy="8.8" r="5.4" /><path d="M12.9 12.9l3.8 3.8" /></svg>
+      <input name="q" type="text" placeholder="Найти через Tor или ввести адрес .onion" autocomplete="off" spellcheck="false" autofocus />
+      <button type="submit">Найти</button>
+    </form>
+
+    <div class="links">
+      <a href="https://check.torproject.org/?lang=ru"><b>Проверить Tor</b><span>check.torproject.org</span></a>
+      <a href="https://duckduckgogg42xjoc72x3sjasowoarfbgcmvfimaftt6twagswzczad.onion/"><b>DuckDuckGo</b><span>.onion</span></a>
+      <a href="http://juhanurmihxlp77nkq76byazcldy2hlmovfu2epvl5ankdibsot4csyd.onion/"><b>Ahmia</b><span>.onion</span></a>
+      <a href="https://www.torproject.org/"><b>Tor Project</b><span>torproject.org</span></a>
+    </div>
+
+    <p class="hint">
+      Введите адрес в строке сверху или откройте ссылку. Это встроенный Chromium, трафик которого идёт через Tor.
+      Некоторые сайты блокируют выходные узлы Tor.
+    </p>
+  </main>
+
+  <script>
+    const params = new URLSearchParams(location.search);
+    const ip = params.get('ip');
+    const via = params.get('via');
+    if (ip) document.getElementById('ip').textContent = ip;
+    if (via) {
+      document.getElementById('via').hidden = false;
+      document.getElementById('via-sep').hidden = false;
+      document.getElementById('via').textContent = 'через VPN: ' + via;
+    }
+  </script>
+</body>
+</html>
